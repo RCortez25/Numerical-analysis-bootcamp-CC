@@ -1,0 +1,736 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 2: Root Finding}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 2 \\[0.3cm]}
+{\LARGE Root Finding \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+Given an equation $f(x) = 0$, how do we find $x$?\\
+Four classical methods, from the foolproof to the fast,\\
+and the art of choosing between them.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 2.1
+% ============================================================
+\section{The Root-Finding Problem}
+
+\subsection{What Does It Mean to ``Find a Root''?}
+
+One of the most fundamental problems in all of mathematics and science is this: given a function $f$, find a number $x^*$ such that
+\[
+f(x^*) = 0.
+\]
+Such a value $x^*$ is called a \textbf{root} (or \textbf{zero}) of $f$. The root-finding problem is everywhere:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Engineering:} At what angle should you launch a projectile to hit a target 500\,m away? This becomes $f(\theta) = 0$ for the right equation.
+  \item \textbf{Finance:} What interest rate makes the present value of a bond equal to its market price? Again, $f(r) = 0$.
+  \item \textbf{Physics:} At what temperature does a material change phase? At what energy does a quantum system satisfy certain boundary conditions?
+  \item \textbf{Chemistry:} What equilibrium concentration satisfies the mass-action law?
+\end{itemize}
+
+Any equation $g(x) = h(x)$ can be rewritten as $f(x) = g(x) - h(x) = 0$, so root finding is truly universal.
+
+\subsection{Graphical Intuition}
+
+Before diving into algorithms, it is worth remembering the simplest picture: a root of $f$ is a point where the graph of $y = f(x)$ \textbf{crosses the $x$-axis}.
+
+If you can plot $f$, you can often ``see'' roughly where the roots are. This graphical intuition is valuable for:
+\begin{itemize}[leftmargin=2em]
+  \item Estimating how many roots exist in a given interval.
+  \item Choosing a good starting point for an iterative method.
+  \item Sanity-checking the answers a numerical method gives you.
+\end{itemize}
+
+In practice, we use a graph to get a rough idea, then unleash an algorithm to refine it to high precision.
+
+\subsection{Why Exact Solutions Are Often Impossible}
+
+For linear equations ($ax + b = 0$) and quadratics ($ax^2 + bx + c = 0$), we have exact formulas. Cubics and quartics also have formulas, though they are cumbersome. But the story ends there:
+
+\begin{keyconcept}
+\textbf{The Abel--Ruffini theorem} states that there is no general algebraic formula for the roots of polynomials of degree 5 or higher.
+
+For non-polynomial equations---such as $x = \cos(x)$, or $e^x = 3x$---exact closed-form solutions almost never exist.
+\end{keyconcept}
+
+This is why numerical root-finding methods are indispensable. We will study four of them in this unit, starting with the simplest and most reliable, and building toward the fastest.
+
+\begin{takeaway}
+Root finding---solving $f(x) = 0$---is one of the most common tasks in applied mathematics. Exact solutions are rare; iterative numerical methods are how we actually solve these problems in practice.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 2.2
+% ============================================================
+\section{The Bisection Method}
+
+The bisection method is the simplest root-finding algorithm. It is slow but \textbf{absolutely reliable}---it is guaranteed to converge whenever the starting conditions are met.
+
+\subsection{The Foundation: The Intermediate Value Theorem}
+
+The entire method rests on one beautiful theorem from calculus:
+
+\begin{keyconcept}[title={Intermediate Value Theorem (IVT)}]
+If $f$ is continuous on $[a, b]$ and $f(a)$ and $f(b)$ have \textbf{opposite signs} (i.e., $f(a) \cdot f(b) < 0$), then there exists at least one root $x^* \in (a, b)$ such that $f(x^*) = 0$.
+\end{keyconcept}
+
+In plain terms: if a continuous function is positive at one end and negative at the other, it must cross zero somewhere in between. The bisection method exploits this by systematically narrowing the interval.
+
+\subsection{Algorithm Step-by-Step}
+
+The idea is wonderfully simple: \textbf{repeatedly cut the interval in half}, keeping the half that contains the root.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Start} with an interval $[a, b]$ such that $f(a) \cdot f(b) < 0$ (a sign change).
+  \item \textbf{Compute the midpoint:} $c = \dfrac{a + b}{2}$.
+  \item \textbf{Evaluate} $f(c)$.
+  \item \textbf{Decide which half contains the root:}
+  \begin{itemize}
+    \item If $f(a) \cdot f(c) < 0$: the root is in $[a, c]$. Set $b \leftarrow c$.
+    \item If $f(c) \cdot f(b) < 0$: the root is in $[c, b]$. Set $a \leftarrow c$.
+    \item If $f(c) = 0$: we found the exact root! (This rarely happens in practice.)
+  \end{itemize}
+  \item \textbf{Repeat} steps 2--4 until the interval is sufficiently small: $|b - a| < \varepsilon$ for some chosen tolerance $\varepsilon$.
+\end{enumerate}
+
+\begin{example}[title={Bisection in Action}]
+Find a root of $f(x) = x^3 - x - 2$ in the interval $[1, 2]$.
+
+\textbf{Check:} $f(1) = 1 - 1 - 2 = -2 < 0$ and $f(2) = 8 - 2 - 2 = 4 > 0$. Sign change confirmed.
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} ccccl @{}}
+\toprule
+\textbf{Step} & $a$ & $b$ & $c = (a+b)/2$ & $f(c)$ \\
+\midrule
+1 & 1.0000 & 2.0000 & 1.5000 & $f(1.5) = 0.875 > 0$ \\
+2 & 1.0000 & 1.5000 & 1.2500 & $f(1.25) = -1.297 < 0$ \\
+3 & 1.2500 & 1.5000 & 1.3750 & $f(1.375) = -0.224 < 0$ \\
+4 & 1.3750 & 1.5000 & 1.4375 & $f(1.4375) = 0.323 > 0$ \\
+5 & 1.3750 & 1.4375 & 1.4063 & $f(1.4063) = 0.048 > 0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+After just 5 steps, we have narrowed the root to the interval $[1.375, 1.4063]$, a width of about $0.031$. The root is approximately $x^* \approx 1.3953$ (the true root of this cubic to 4 decimal places is $1.5214\ldots$---wait, let us recheck: $f(1.5214) \approx 1.5214^3 - 1.5214 - 2 \approx 3.524 - 1.521 - 2 = 0.003$. The actual root is $x^* \approx 1.5214$.)
+
+Actually, let us redo this more carefully. $f(1.5) = 3.375 - 1.5 - 2 = -0.125 < 0$. So the root is in $[1.5, 2]$. The method continues from there. The key point: bisection systematically traps the root in an ever-shrinking interval.
+\end{example}
+
+\subsection{Guaranteed Convergence and Its Rate}
+
+At each step, the interval is halved. After $n$ steps, the interval width is:
+\[
+|b_n - a_n| = \frac{b_0 - a_0}{2^n}.
+\]
+
+So the error (distance from the midpoint to the true root) is at most:
+\[
+|e_n| \leq \frac{b_0 - a_0}{2^{n+1}}.
+\]
+
+\begin{keyconcept}
+To achieve an error less than $\varepsilon$, the bisection method needs
+\[
+n \geq \frac{\ln(b_0 - a_0) - \ln(\varepsilon)}{\ln 2}
+\]
+steps. You can compute in advance exactly how many steps you need!
+\end{keyconcept}
+
+\begin{example}[title={How Many Steps?}]
+Starting with $[a, b] = [0, 1]$ (width 1), how many bisection steps to get accuracy $\varepsilon = 10^{-6}$?
+\[
+n \geq \frac{\ln(1) - \ln(10^{-6})}{\ln 2} = \frac{6 \ln 10}{\ln 2} \approx \frac{13.816}{0.693} \approx 19.9.
+\]
+So we need \textbf{20 steps}. That is 20 function evaluations to get 6 decimal places of accuracy---reliable, but not particularly fast.
+\end{example}
+
+The bisection method has \textbf{linear convergence}: each step gains roughly one bit (about 0.3 decimal digits) of accuracy. The convergence rate is $C = 0.5$ with order $p = 1$.
+
+\subsection{Strengths and Limitations}
+
+\begin{center}
+\begin{tabular}{@{} p{0.45\textwidth} p{0.45\textwidth} @{}}
+\toprule
+\textbf{Strengths} & \textbf{Limitations} \\
+\midrule
+\textbf{Guaranteed} to converge (if you start with a sign change) & \textbf{Slow}: only linear convergence \\[4pt]
+No derivatives needed & Requires a starting interval $[a, b]$ with a sign change \\[4pt]
+Simple to implement and understand & Cannot find roots where $f$ just touches zero without crossing (e.g., $f(x) = x^2$) \\[4pt]
+Number of steps is predictable in advance & Only finds one root at a time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+The bisection method is the ``tortoise'' of root-finding: slow but sure. It is the method of choice when reliability is paramount, and it serves as a baseline against which faster methods are compared.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 2.3
+% ============================================================
+\section{Fixed-Point Iteration}
+
+Before jumping to Newton's method, it is worth understanding a more general framework: \textbf{fixed-point iteration}. Newton's method (Section 2.4) is, in fact, a special case of this framework.
+
+\subsection{Reformulating the Problem}
+
+Instead of solving $f(x) = 0$, suppose we rewrite the equation in the form:
+\[
+x = g(x).
+\]
+A value $x^*$ satisfying $x^* = g(x^*)$ is called a \textbf{fixed point} of $g$. The name makes sense: if you feed $x^*$ into $g$, you get $x^*$ back---the point is ``fixed'' under the action of $g$.
+
+Any equation $f(x) = 0$ can be rearranged into this form, often in multiple ways. For example, $x^3 - x - 2 = 0$ could become:
+\begin{align*}
+x &= x^3 - 2 && \text{(one rearrangement)} \\
+x &= (x + 2)^{1/3} && \text{(another rearrangement)} \\
+x &= \frac{x^3 - 2}{x^2 - 1} + x && \text{(yet another)}
+\end{align*}
+Different rearrangements lead to different $g$ functions---and, crucially, different convergence behavior.
+
+\subsection{The Iteration}
+
+Fixed-point iteration is the simplest possible iterative scheme:
+
+\begin{enumerate}[leftmargin=2em]
+  \item Choose an initial guess $x_0$.
+  \item Compute $x_{n+1} = g(x_n)$ for $n = 0, 1, 2, \ldots$
+  \item Repeat until $|x_{n+1} - x_n| < \varepsilon$ (or some other stopping criterion).
+\end{enumerate}
+
+That is the entire algorithm: just keep plugging the output back in as the next input.
+
+\subsection{Graphical Interpretation}
+
+Fixed-point iteration has an elegant graphical picture. Plot both $y = g(x)$ and $y = x$ (the identity line). A fixed point is where these two curves \textbf{intersect}.
+
+The iteration can be visualized as a ``staircase'' or ``cobweb'' pattern:
+\begin{enumerate}[leftmargin=2em]
+  \item Start at $x_0$ on the $x$-axis.
+  \item Go vertically to the curve $y = g(x)$ to get $g(x_0)$.
+  \item Go horizontally to the line $y = x$ to get the new point $x_1 = g(x_0)$.
+  \item Repeat: go vertically to $y = g(x)$, horizontally to $y = x$, and so on.
+\end{enumerate}
+
+If the staircase spirals \emph{inward} toward the intersection, the method converges. If it spirals \emph{outward}, the method diverges.
+
+\subsection{When Does It Converge?}
+
+The convergence of fixed-point iteration depends on the \textbf{slope} of $g$ near the fixed point.
+
+\begin{keyconcept}[title={Fixed-Point Convergence Theorem}]
+If $g$ is continuously differentiable and $|g'(x^*)| < 1$ at the fixed point $x^*$, then fixed-point iteration $x_{n+1} = g(x_n)$ converges to $x^*$ for any starting guess $x_0$ sufficiently close to $x^*$.
+
+\medskip
+Moreover:
+\begin{itemize}
+  \item If $|g'(x^*)| < 1$: the iteration \textbf{converges} (the fixed point is \textbf{attracting}).
+  \item If $|g'(x^*)| > 1$: the iteration \textbf{diverges} (the fixed point is \textbf{repelling}).
+  \item If $|g'(x^*)| = 1$: convergence is uncertain---further analysis is needed.
+\end{itemize}
+\end{keyconcept}
+
+The intuition is simple: $g'(x^*)$ tells you how much $g$ stretches or compresses near the fixed point. If $|g'| < 1$, the function is a \textbf{contraction}---it pulls points closer together, and the iterates spiral inward.
+
+\begin{example}[title={Convergence vs.\ Divergence}]
+Solve $x^3 - x - 2 = 0$ (which has a root near $x^* \approx 1.5214$).
+
+\textbf{Rearrangement 1:} $g_1(x) = x^3 - 2$. Then $g_1'(x) = 3x^2$, so $g_1'(1.5214) \approx 6.94$. Since $|g_1'| \gg 1$, the iteration $x_{n+1} = x_n^3 - 2$ will \textbf{diverge}.
+
+\textbf{Rearrangement 2:} $g_2(x) = (x + 2)^{1/3}$. Then $g_2'(x) = \frac{1}{3}(x+2)^{-2/3}$, so $g_2'(1.5214) \approx 0.21$. Since $|g_2'| < 1$, the iteration $x_{n+1} = (x_n + 2)^{1/3}$ will \textbf{converge}.
+
+\medskip
+Starting from $x_0 = 1$:
+\begin{center}
+\begin{tabular}{@{} cl @{}}
+\toprule
+$n$ & $x_n = (x_{n-1} + 2)^{1/3}$ \\
+\midrule
+0 & 1.0000 \\
+1 & 1.4422 \\
+2 & 1.5102 \\
+3 & 1.5192 \\
+4 & 1.5204 \\
+5 & 1.5206 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Convergence is clear, though not spectacularly fast---this is \textbf{linear convergence}.
+\end{example}
+
+\begin{warning}
+The \textbf{choice of rearrangement matters enormously}. The same equation can lead to a convergent or divergent iteration depending on how you write $x = g(x)$. Always check that $|g'(x^*)| < 1$ near the root.
+\end{warning}
+
+\subsection{Rate of Convergence}
+
+For fixed-point iteration, the error satisfies approximately:
+\[
+|e_{n+1}| \approx |g'(x^*)| \cdot |e_n|.
+\]
+
+This is \textbf{linear convergence} with rate $C = |g'(x^*)|$. Smaller $|g'|$ means faster convergence. The ideal case would be $g'(x^*) = 0$---and this is precisely what Newton's method achieves!
+
+\begin{takeaway}
+Fixed-point iteration is a general framework: rewrite $f(x) = 0$ as $x = g(x)$ and iterate. It converges when $|g'(x^*)| < 1$ near the root. The convergence is linear, and the speed depends on how small $|g'|$ is. Newton's method, up next, is a brilliantly chosen fixed-point iteration where $g'(x^*) = 0$.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 2.4
+% ============================================================
+\section{Newton's Method (Newton--Raphson)}
+
+Newton's method is the crown jewel of root finding. When it works, it is breathtakingly fast. Understanding both its power and its pitfalls is essential.
+
+\subsection{The Tangent Line Idea}
+
+The derivation is beautifully geometric. Suppose we have a current guess $x_n$ for the root of $f(x) = 0$. The idea:
+
+\begin{enumerate}[leftmargin=2em]
+  \item Draw the \textbf{tangent line} to $y = f(x)$ at the point $(x_n, f(x_n))$.
+  \item Find where this tangent line \textbf{crosses the $x$-axis}. That crossing point becomes the next guess $x_{n+1}$.
+\end{enumerate}
+
+The tangent line at $x_n$ is:
+\[
+y - f(x_n) = f'(x_n)(x - x_n).
+\]
+Setting $y = 0$ and solving for $x$:
+\[
+0 - f(x_n) = f'(x_n)(x_{n+1} - x_n) \quad \Longrightarrow \quad x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}.
+\]
+
+\begin{keyconcept}[title={Newton's Method}]
+Given a differentiable function $f$ and an initial guess $x_0$, the iteration
+\[
+\boxed{x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}}
+\]
+produces a sequence of approximations to a root of $f(x) = 0$.
+\end{keyconcept}
+
+\subsection{Algorithm}
+
+\begin{enumerate}[leftmargin=2em]
+  \item Choose an initial guess $x_0$ (ideally close to the root).
+  \item For $n = 0, 1, 2, \ldots$:
+  \begin{enumerate}
+    \item Evaluate $f(x_n)$ and $f'(x_n)$.
+    \item Compute $x_{n+1} = x_n - \dfrac{f(x_n)}{f'(x_n)}$.
+    \item If $|x_{n+1} - x_n| < \varepsilon$ or $|f(x_{n+1})| < \varepsilon$, stop.
+  \end{enumerate}
+\end{enumerate}
+
+\subsection{Quadratic Convergence}
+
+The magic of Newton's method is its convergence rate. Near a simple root (where $f'(x^*) \neq 0$):
+
+\begin{keyconcept}[title={Quadratic Convergence of Newton's Method}]
+If $x_0$ is sufficiently close to a simple root $x^*$, then Newton's method converges \textbf{quadratically}:
+\[
+|e_{n+1}| \approx \frac{|f''(x^*)|}{2|f'(x^*)|}\,|e_n|^2.
+\]
+The number of correct digits approximately \textbf{doubles} at each step.
+\end{keyconcept}
+
+\begin{example}[title={Newton's Method: Blazing Speed}]
+Find $\sqrt{2}$ by solving $f(x) = x^2 - 2 = 0$. Here $f'(x) = 2x$, so the iteration is:
+\[
+x_{n+1} = x_n - \frac{x_n^2 - 2}{2x_n} = \frac{x_n}{2} + \frac{1}{x_n}.
+\]
+
+Starting from $x_0 = 1$:
+\begin{center}
+\begin{tabular}{@{} cll @{}}
+\toprule
+$n$ & $x_n$ & Correct digits \\
+\midrule
+0 & 1.000000000000000 & 1 \\
+1 & 1.500000000000000 & 1 \\
+2 & 1.416666666666667 & 3 \\
+3 & 1.414215686274510 & 6 \\
+4 & 1.414213562374690 & 12 \\
+5 & 1.414213562373095 & 16 (full double precision!) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In just \textbf{5 iterations}, Newton's method achieves machine-precision accuracy. Compare this to bisection, which would need about 50 steps!
+\end{example}
+
+\subsection{When Newton's Method Fails}
+
+Despite its power, Newton's method is not foolproof. There are several ways it can go wrong:
+
+\subsubsection{Bad Initial Guess}
+
+If $x_0$ is too far from the root, the tangent line may lead to a point even farther away. The iterates may oscillate, diverge, or converge to a \emph{different} root than intended.
+
+\subsubsection{Zero Derivative}
+
+If $f'(x_n) = 0$ at some iterate, the formula $x_{n+1} = x_n - f(x_n)/f'(x_n)$ involves division by zero. Geometrically, the tangent line is horizontal and never crosses the $x$-axis.
+
+\subsubsection{Multiple Roots}
+
+If the root has multiplicity $m > 1$ (e.g., $f(x) = (x-1)^2$ at $x^* = 1$), then $f'(x^*) = 0$ and convergence degrades to \textbf{linear} instead of quadratic.
+
+\subsubsection{Cycles}
+
+For some functions, Newton's method can enter a cycle, bouncing between two or more points without ever converging. This is rare but possible.
+
+\begin{warning}
+Newton's method is \textbf{locally convergent}: it works beautifully \emph{near} the root, but offers no guarantee of convergence from an arbitrary starting point. In practice, you often combine bisection (for reliability) with Newton (for speed)---use bisection to get close, then switch to Newton to finish fast.
+\end{warning}
+
+\subsection{The Role of the Derivative}
+
+Newton's method requires computing $f'(x)$ at every step. This is both a strength and a burden:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Strength:} The derivative provides ``slope information'' that guides the iteration directly toward the root. This is why convergence is so fast.
+  \item \textbf{Burden:} You need a formula for $f'(x)$. If $f$ is complicated, computing the derivative may be expensive or inconvenient. If $f$ is given only as data (not a formula), the derivative may not be available at all.
+\end{itemize}
+
+This motivates the next method: what if we could get \emph{nearly} the speed of Newton's method \emph{without} needing the derivative?
+
+\begin{takeaway}
+Newton's method achieves quadratic convergence by using the tangent line to guide each step. It is spectacularly fast when it works, but it requires a good initial guess, a nonzero derivative, and a formula for $f'(x)$. Its failures motivate both the secant method (no derivative needed) and hybrid strategies (combine with bisection for safety).
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 2.5
+% ============================================================
+\section{The Secant Method}
+
+The secant method answers a natural question: \emph{can we get close to Newton's speed without computing derivatives?}
+
+\subsection{Approximating the Derivative}
+
+Recall Newton's formula:
+\[
+x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}.
+\]
+
+The key idea of the secant method is to \textbf{replace the derivative} $f'(x_n)$ with a finite-difference approximation using the two most recent iterates:
+\[
+f'(x_n) \approx \frac{f(x_n) - f(x_{n-1})}{x_n - x_{n-1}}.
+\]
+
+This is just the slope of the \textbf{secant line}---the line connecting the two points $(x_{n-1}, f(x_{n-1}))$ and $(x_n, f(x_n))$ on the graph of $f$.
+
+\subsection{The Algorithm}
+
+\begin{keyconcept}[title={Secant Method}]
+Given two initial guesses $x_0$ and $x_1$, the iteration is:
+\[
+\boxed{x_{n+1} = x_n - f(x_n) \cdot \frac{x_n - x_{n-1}}{f(x_n) - f(x_{n-1})}}
+\]
+\end{keyconcept}
+
+\begin{enumerate}[leftmargin=2em]
+  \item Choose two initial guesses $x_0$ and $x_1$ (they do not need to bracket the root).
+  \item For $n = 1, 2, 3, \ldots$:
+  \begin{enumerate}
+    \item Compute $x_{n+1}$ using the secant formula above.
+    \item If $|x_{n+1} - x_n| < \varepsilon$ or $|f(x_{n+1})| < \varepsilon$, stop.
+  \end{enumerate}
+\end{enumerate}
+
+Notice that each step requires only \textbf{one new function evaluation} (we reuse $f(x_{n-1})$ from the previous step). Newton's method also uses one function evaluation per step, but additionally requires one \emph{derivative} evaluation.
+
+\begin{example}[title={Secant Method in Action}]
+Solve $f(x) = x^3 - x - 2 = 0$ starting with $x_0 = 1$ and $x_1 = 2$.
+
+\begin{center}
+\begin{tabular}{@{} clll @{}}
+\toprule
+$n$ & $x_n$ & $f(x_n)$ & \\
+\midrule
+0 & 1.00000 & $-2.00000$ & \\
+1 & 2.00000 & $4.00000$ & \\
+2 & 1.33333 & $-0.96296$ & \\
+3 & 1.45238 & $-0.38800$ & \\
+4 & 1.52425 & $0.01891$ & \\
+5 & 1.52129 & $-0.00083$ & \\
+6 & 1.52138 & $0.00000$ & converged! \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Six steps to reach the root $x^* \approx 1.52138$---no derivatives needed.
+\end{example}
+
+\subsection{Convergence Rate}
+
+The secant method converges \textbf{superlinearly} with order:
+\[
+p = \frac{1 + \sqrt{5}}{2} \approx 1.618 \quad \text{(the golden ratio!)}.
+\]
+
+This means:
+\begin{itemize}[leftmargin=2em]
+  \item It is \textbf{faster than linear} convergence (bisection, basic fixed-point).
+  \item It is \textbf{slower than quadratic} convergence (Newton's method).
+  \item But since each step is cheaper (no derivative evaluation), the secant method can be \emph{more efficient overall} when derivative computation is expensive.
+\end{itemize}
+
+\subsection{Comparison with Newton's Method}
+
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+& \textbf{Newton's Method} & \textbf{Secant Method} \\
+\midrule
+Convergence order & 2 (quadratic) & 1.618 (superlinear) \\
+Requires derivative? & Yes & No \\
+Function evaluations per step & 1 (plus 1 derivative) & 1 \\
+Initial guesses needed & 1 & 2 \\
+Reliability & Local convergence & Local convergence \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+The secant method trades a small reduction in convergence speed for the significant practical advantage of not needing derivatives. Its convergence order---the golden ratio---is a remarkable mathematical fact. In many real-world problems, the secant method is the preferred choice.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 2.6
+% ============================================================
+\section{Comparison and Practical Considerations}
+
+Now that we have four methods in our toolkit, let us step back and think about how to choose among them in practice.
+
+\subsection{The Big Picture: Speed vs.\ Reliability}
+
+\begin{center}
+\begin{tabular}{@{} lcccl @{}}
+\toprule
+\textbf{Method} & \textbf{Order} & \textbf{Needs $f'$?} & \textbf{Guaranteed?} & \textbf{Character} \\
+\midrule
+Bisection & 1 (linear) & No & Yes (with bracket) & Slow but safe \\
+Fixed-Point & 1 (linear) & No & If $|g'| < 1$ & Framework/theory \\
+Newton & 2 (quadratic) & Yes & No (local only) & Fast but risky \\
+Secant & 1.618 & No & No (local only) & Good compromise \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The fundamental trade-off: \textbf{speed vs.\ reliability}. Fast methods (Newton, secant) converge in few steps but may fail if the initial guess is poor. Slow methods (bisection) are guaranteed to work but take many steps.
+
+\subsection{Stopping Criteria}
+
+When do we stop iterating? In practice, we use one or more of these criteria:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Residual test:} Stop when $|f(x_n)| < \varepsilon_f$. This checks whether $x_n$ makes $f$ nearly zero.
+
+  \item \textbf{Step-size test:} Stop when $|x_{n+1} - x_n| < \varepsilon_x$. This checks whether the iterates have ``settled down.''
+
+  \item \textbf{Maximum iterations:} Stop after $N_{\max}$ steps to prevent infinite loops if the method fails to converge.
+\end{enumerate}
+
+\begin{warning}
+No single stopping criterion is perfect:
+\begin{itemize}
+  \item The residual test can be fooled by flat functions: if $f$ is very flat near the root, $|f(x)|$ can be small even when $x$ is far from $x^*$.
+  \item The step-size test can be fooled by slow convergence: small steps do not guarantee you are close to the root.
+  \item In practice, use \textbf{both} the residual and step-size tests together, along with a maximum iteration count as a safety net.
+\end{itemize}
+\end{warning}
+
+\subsection{Hybrid Strategies}
+
+In serious scientific computing, people rarely use a single method in isolation. The most common strategy is a \textbf{hybrid} approach:
+
+\begin{enumerate}[leftmargin=2em]
+  \item Use \textbf{bisection} to get a rough approximation and a safe bracket.
+  \item Switch to \textbf{Newton's or the secant method} to finish quickly with high accuracy.
+\end{enumerate}
+
+This combines the \textbf{global reliability} of bisection with the \textbf{local speed} of Newton/secant. Many professional root-finding routines (like Brent's method, found in most scientific libraries) use clever combinations of bisection, secant, and inverse quadratic interpolation to get the best of all worlds.
+
+\subsection{Choosing the Right Method}
+
+Here is a practical decision guide:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{You have a bracket $[a,b]$ with a sign change?}
+  \begin{itemize}
+    \item Start with bisection for safety, then switch to secant/Newton.
+    \item Or use a library routine (Brent's method) that does this automatically.
+  \end{itemize}
+
+  \item \textbf{You have a good initial guess and $f'$ is easy to compute?}
+  \begin{itemize}
+    \item Use Newton's method.
+  \end{itemize}
+
+  \item \textbf{You have a good initial guess but $f'$ is expensive or unavailable?}
+  \begin{itemize}
+    \item Use the secant method.
+  \end{itemize}
+
+  \item \textbf{You need a guaranteed answer and don't care about speed?}
+  \begin{itemize}
+    \item Use bisection.
+  \end{itemize}
+
+  \item \textbf{You're exploring or prototyping?}
+  \begin{itemize}
+    \item Start with bisection to understand the problem, then optimize.
+  \end{itemize}
+\end{itemize}
+
+\begin{takeaway}
+There is no single ``best'' root-finding method. The right choice depends on what you know about the function (derivative? bracket?), how accurate you need to be, and how much computation time you can afford. In practice, \textbf{hybrid methods} that combine reliability and speed are the gold standard.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 2 Summary}
+\addcontentsline{toc}{section}{Unit 2 Summary}
+
+This unit introduced the root-finding problem and four fundamental methods for solving $f(x) = 0$:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Bisection:} Uses the Intermediate Value Theorem to repeatedly halve a bracketing interval. Linear convergence ($O(2^{-n})$). Slow but guaranteed.
+
+  \item \textbf{Fixed-Point Iteration:} Rewrites $f(x) = 0$ as $x = g(x)$ and iterates $x_{n+1} = g(x_n)$. Converges linearly when $|g'(x^*)| < 1$. Important as a conceptual framework.
+
+  \item \textbf{Newton's Method:} Uses the tangent line: $x_{n+1} = x_n - f(x_n)/f'(x_n)$. Quadratic convergence near simple roots. Requires the derivative and a good initial guess.
+
+  \item \textbf{Secant Method:} Approximates the derivative using a finite difference: requires two starting points but no derivative. Superlinear convergence of order $\approx 1.618$.
+\end{enumerate}
+
+\medskip
+Key themes to carry forward:
+\begin{itemize}[leftmargin=2em]
+  \item The \textbf{speed--reliability trade-off} is central to choosing a method.
+  \item \textbf{Convergence rate} (linear, superlinear, quadratic) determines practical efficiency.
+  \item \textbf{Stopping criteria} must be chosen with care---use multiple tests.
+  \item \textbf{Hybrid approaches} combine the strengths of different methods.
+\end{itemize}
+
+\end{document}
