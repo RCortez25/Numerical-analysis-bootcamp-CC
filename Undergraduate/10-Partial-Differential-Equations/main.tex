@@ -1,0 +1,590 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 10: Partial Differential Equations}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 10 \\[0.3cm]}
+{\LARGE Partial Differential Equations \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+Heat diffuses, waves propagate, and potentials reach equilibrium.\\
+Finite differences extend to two dimensions, giving us the tools\\
+to tackle the three great classes of PDEs.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 10.1
+% ============================================================
+\section{Introduction to PDEs}
+
+\subsection{What Is a PDE?}
+
+A \textbf{partial differential equation} (PDE) involves an unknown function of \emph{two or more} independent variables and its partial derivatives. Where an ODE governs a function of one variable ($y(t)$ or $y(x)$), a PDE governs a function like $u(x, t)$ or $u(x, y)$.
+
+PDEs are the mathematical language of spatially distributed phenomena: heat flow, wave propagation, fluid motion, electromagnetic fields, quantum mechanics, and much more. Virtually every physical system that varies in both space and time is described by a PDE.
+
+\subsection{The Three Classic Types}
+
+Most second-order PDEs encountered in science and engineering fall into one of three categories:
+
+\begin{keyconcept}[title={The Three Types of Second-Order PDEs}]
+\begin{enumerate}
+  \item \textbf{Parabolic} (diffusion): $\displaystyle \frac{\partial u}{\partial t} = \alpha\,\frac{\partial^2 u}{\partial x^2}$.
+
+  Models: heat conduction, chemical diffusion. The solution \textbf{smooths out} over time.
+
+  \item \textbf{Hyperbolic} (wave): $\displaystyle \frac{\partial^2 u}{\partial t^2} = c^2\,\frac{\partial^2 u}{\partial x^2}$.
+
+  Models: vibrating strings, sound waves, electromagnetic waves. Information \textbf{propagates} at speed $c$.
+
+  \item \textbf{Elliptic} (equilibrium): $\displaystyle \frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} = f(x, y)$.
+
+  Models: steady-state temperature, electrostatic potential, gravitational fields. No time dependence---the solution is an \textbf{equilibrium}.
+\end{enumerate}
+\end{keyconcept}
+
+\subsection{Boundary and Initial Conditions}
+
+PDEs require more conditions than ODEs:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Parabolic} (heat equation): initial condition $u(x, 0) = f(x)$ plus boundary conditions at both ends for all time.
+  \item \textbf{Hyperbolic} (wave equation): initial position $u(x, 0)$ \emph{and} initial velocity $u_t(x, 0)$ plus boundary conditions.
+  \item \textbf{Elliptic} (Laplace/Poisson): boundary conditions on the entire boundary of the domain. No initial conditions (no time variable).
+\end{itemize}
+
+The most common boundary conditions are \textbf{Dirichlet} (prescribe $u$ on the boundary) and \textbf{Neumann} (prescribe the normal derivative $\partial u/\partial n$ on the boundary).
+
+\begin{takeaway}
+PDEs govern functions of multiple variables and arise throughout science and engineering. The three classic types---parabolic (diffusion), hyperbolic (waves), and elliptic (equilibrium)---each have distinct physical behavior and require different numerical strategies. Parabolic and hyperbolic PDEs need initial conditions; elliptic PDEs need only boundary conditions.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 10.2
+% ============================================================
+\section{Finite Differences in Two Dimensions}
+
+The finite difference idea from Units 6 and 9 extends naturally to PDEs. We discretize each independent variable on a grid and replace partial derivatives with difference quotients.
+
+\subsection{The Computational Grid}
+
+For a PDE in $x$ and $t$ (heat or wave equation), we create a \textbf{space-time grid}:
+
+\begin{itemize}[leftmargin=2em]
+  \item Space: $x_i = a + i\,\Delta x$, $i = 0, 1, \ldots, M$.
+  \item Time: $t_n = n\,\Delta t$, $n = 0, 1, 2, \ldots$
+\end{itemize}
+
+We denote the approximate solution at grid point $(x_i, t_n)$ by $u_i^n$.
+
+For an elliptic PDE in $x$ and $y$, we create a \textbf{spatial grid}:
+
+\begin{itemize}[leftmargin=2em]
+  \item $x_i = a + i\,h$, $i = 0, 1, \ldots, N_x$.
+  \item $y_j = c + j\,h$, $j = 0, 1, \ldots, N_y$.
+\end{itemize}
+
+with the approximate solution $u_{i,j} \approx u(x_i, y_j)$.
+
+\subsection{Discretizing Partial Derivatives}
+
+Each partial derivative is replaced by a finite difference in the corresponding variable:
+
+\begin{keyconcept}[title={Finite Difference Stencils for PDEs}]
+\begin{align*}
+\frac{\partial u}{\partial t}\bigg|_{i}^{n} &\approx \frac{u_i^{n+1} - u_i^n}{\Delta t} \quad \text{(forward in time, $O(\Delta t)$)}, \\[8pt]
+\frac{\partial^2 u}{\partial x^2}\bigg|_{i}^{n} &\approx \frac{u_{i-1}^n - 2u_i^n + u_{i+1}^n}{(\Delta x)^2} \quad \text{(centered in space, $O((\Delta x)^2)$)}, \\[8pt]
+\frac{\partial^2 u}{\partial y^2}\bigg|_{i,j} &\approx \frac{u_{i,j-1} - 2u_{i,j} + u_{i,j+1}}{h^2} \quad \text{(centered in $y$, $O(h^2)$)}.
+\end{align*}
+\end{keyconcept}
+
+These are exactly the same formulas from Unit 6, applied separately to each variable. The key parameter that controls stability and accuracy is the \textbf{mesh ratio}:
+
+\[
+r = \frac{\alpha\,\Delta t}{(\Delta x)^2} \quad \text{(for the heat equation)}, \qquad
+r = \frac{c\,\Delta t}{\Delta x} \quad \text{(for the wave equation)}.
+\]
+
+\begin{takeaway}
+Finite differences for PDEs discretize each independent variable on a grid. Partial derivatives are approximated by the same central and forward difference formulas used for ODEs, applied in each coordinate direction. The mesh ratio $r$ (relating the time step to the spatial grid) is the critical parameter governing stability.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 10.3
+% ============================================================
+\section{The Heat Equation (Parabolic PDEs)}
+
+The heat equation describes how temperature diffuses through a material. It is the prototype of parabolic PDEs.
+
+\subsection{Physical Setup}
+
+Consider a thin rod of length 1. The temperature $u(x, t)$ satisfies:
+\[
+\frac{\partial u}{\partial t} = \frac{\partial^2 u}{\partial x^2}, \qquad u(0, t) = u(1, t) = 0, \qquad u(x, 0) = \sin(\pi x).
+\]
+
+Both ends are held at $0^\circ$ (Dirichlet boundary conditions), and the initial temperature distribution is a sine arch. The exact solution is:
+\[
+u(x, t) = e^{-\pi^2 t}\,\sin(\pi x),
+\]
+which decays exponentially toward zero---heat diffuses out through the boundaries.
+
+\subsection{The Explicit Method (FTCS)}
+
+Substituting the forward-in-time, centered-in-space differences:
+
+\begin{keyconcept}[title={FTCS Scheme (Forward Time, Centered Space)}]
+\[
+u_i^{n+1} = u_i^n + r\big(u_{i-1}^n - 2u_i^n + u_{i+1}^n\big),
+\]
+where $r = \Delta t / (\Delta x)^2$. This is \textbf{explicit}: the new time level is computed directly from the old one, marching forward one step at a time.
+\end{keyconcept}
+
+The method is simple to implement: loop over all interior grid points, apply the formula, and advance to the next time step.
+
+\begin{example}[title={FTCS for the Heat Equation}]
+Use $\Delta x = 0.25$ ($M = 4$) and $r = 0.5$ (so $\Delta t = 0.5 \times 0.0625 = 0.03125$). Interior points: $x_1 = 0.25$, $x_2 = 0.50$, $x_3 = 0.75$.
+
+At $r = 0.5$, the FTCS formula simplifies: $u_i^{n+1} = \frac{1}{2}(u_{i-1}^n + u_{i+1}^n)$---each value becomes the average of its two neighbors.
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} c c rrr c rrr @{}}
+\toprule
+& & \multicolumn{3}{c}{\textbf{FTCS solution}} & & \multicolumn{3}{c}{\textbf{Exact solution}} \\
+\cmidrule(lr){3-5} \cmidrule(lr){7-9}
+Step & $t$ & $u_1$ & $u_2$ & $u_3$ & & $u_1$ & $u_2$ & $u_3$ \\
+\midrule
+0 & 0.000 & 0.707 & 1.000 & 0.707 & & 0.707 & 1.000 & 0.707 \\
+1 & 0.031 & 0.500 & 0.707 & 0.500 & & 0.520 & 0.735 & 0.520 \\
+2 & 0.063 & 0.354 & 0.500 & 0.354 & & 0.382 & 0.540 & 0.382 \\
+3 & 0.094 & 0.250 & 0.354 & 0.250 & & 0.281 & 0.397 & 0.281 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The FTCS solution captures the qualitative behavior: the temperature decays toward zero while maintaining the sinusoidal shape. The numerical decay rate ($\times 0.707$ per step) is slightly faster than the exact decay rate ($\times 0.735$ per step)---a consequence of the discretization error.
+\end{example}
+
+\subsection{The Stability Constraint}
+
+\begin{warning}[title={Stability of the Explicit Method}]
+The FTCS scheme is stable only when
+\[
+r = \frac{\Delta t}{(\Delta x)^2} \leq \frac{1}{2}.
+\]
+If $r > \frac{1}{2}$, the numerical solution develops oscillations that grow exponentially---the computation blows up.
+
+This is a severe restriction: halving $\Delta x$ requires \textbf{quartering} $\Delta t$ (since $\Delta t \leq (\Delta x)^2 / 2$). Fine spatial grids demand extremely small time steps.
+\end{warning}
+
+\subsection{The Implicit Method (BTCS)}
+
+To remove the stability restriction, we can evaluate the spatial derivative at the \emph{new} time level:
+
+\begin{keyconcept}[title={BTCS Scheme (Backward Time, Centered Space)}]
+\[
+u_i^{n+1} - r\big(u_{i-1}^{n+1} - 2u_i^{n+1} + u_{i+1}^{n+1}\big) = u_i^n.
+\]
+This is \textbf{implicit}: the unknowns at time level $n+1$ are coupled. At each time step, we must solve a \textbf{tridiagonal system} (just as in Unit 9).
+\end{keyconcept}
+
+The payoff: BTCS is \textbf{unconditionally stable}---it works for \emph{any} value of $r$. We can take large time steps without the solution blowing up. The price: solving a tridiagonal system at each step ($O(M)$ work per step, via the Thomas algorithm).
+
+This is the same explicit-vs-implicit trade-off we saw with forward vs.\ backward Euler in Unit 8: explicit methods are simple but stability-limited; implicit methods are unconditionally stable but require solving a system.
+
+\begin{takeaway}
+The heat equation is solved by marching forward in time. The explicit FTCS scheme is simple but requires $r \leq \frac{1}{2}$, which severely limits $\Delta t$ for fine grids. The implicit BTCS scheme is unconditionally stable and allows large time steps, at the cost of solving a tridiagonal system per step. Both schemes are $O((\Delta x)^2)$ in space; FTCS is $O(\Delta t)$ in time, while BTCS is also $O(\Delta t)$.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 10.4
+% ============================================================
+\section{The Wave Equation (Hyperbolic PDEs)}
+
+The wave equation describes vibrating strings, sound waves, and electromagnetic radiation. Unlike the heat equation (which smooths things out), the wave equation \textbf{preserves} features and propagates them through space.
+
+\subsection{Physical Setup}
+
+A vibrating string of length 1, fixed at both ends:
+\[
+\frac{\partial^2 u}{\partial t^2} = c^2\,\frac{\partial^2 u}{\partial x^2}, \qquad u(0, t) = u(1, t) = 0,
+\]
+with initial displacement $u(x, 0) = f(x)$ and initial velocity $u_t(x, 0) = g(x)$.
+
+The wave equation is \textbf{second-order in time}, so it requires \emph{two} initial conditions (position and velocity)---just as a second-order ODE requires two initial values.
+
+\subsection{The Explicit Finite Difference Scheme}
+
+Replacing both $u_{tt}$ and $u_{xx}$ with central differences:
+
+\begin{keyconcept}[title={Explicit Scheme for the Wave Equation}]
+\[
+u_i^{n+1} = 2u_i^n - u_i^{n-1} + r^2\big(u_{i-1}^n - 2u_i^n + u_{i+1}^n\big),
+\]
+where $r = c\,\Delta t / \Delta x$ is the \textbf{Courant number}. This uses values at \emph{two} previous time levels ($n$ and $n-1$) to compute the new level $n+1$.
+\end{keyconcept}
+
+Since the scheme requires two previous time levels, we need a special formula for the first step. Using the initial velocity condition $u_t(x, 0) = g(x)$ and a Taylor expansion:
+\[
+u_i^1 = u_i^0 + \Delta t\,g(x_i) + \frac{r^2}{2}\big(u_{i-1}^0 - 2u_i^0 + u_{i+1}^0\big).
+\]
+
+\subsection{The CFL Condition}
+
+\begin{keyconcept}[title={CFL Stability Condition}]
+The explicit wave equation scheme is stable if and only if
+\[
+r = \frac{c\,\Delta t}{\Delta x} \leq 1.
+\]
+This is the \textbf{Courant--Friedrichs--Lewy (CFL) condition}. Physically, it says the numerical domain of dependence must contain the physical domain of dependence: information cannot travel more than one grid cell per time step.
+\end{keyconcept}
+
+A remarkable fact: when $r = 1$ exactly, the finite difference scheme gives the \textbf{exact solution} of the wave equation. This is because the discrete scheme perfectly captures the wave propagation at this special mesh ratio.
+
+The CFL condition is less restrictive than the heat equation stability condition. Halving $\Delta x$ requires only halving $\Delta t$ (since $\Delta t \leq \Delta x / c$), compared to quartering $\Delta t$ for the heat equation.
+
+\begin{takeaway}
+The wave equation is solved with an explicit scheme that uses two previous time levels. The CFL condition $r = c\,\Delta t / \Delta x \leq 1$ ensures stability. At $r = 1$, the scheme is exact. The CFL condition is less restrictive than the heat equation stability constraint, reflecting the different physics: waves propagate information at finite speed, while heat diffuses instantaneously.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 10.5
+% ============================================================
+\section{Laplace's and Poisson's Equations (Elliptic PDEs)}
+
+Elliptic PDEs describe \textbf{equilibrium} and \textbf{steady-state} problems. There is no time variable---the solution represents a balance of forces or fluxes that does not change.
+
+\subsection{The Equations}
+
+\begin{keyconcept}[title={Laplace's and Poisson's Equations}]
+On a domain $\Omega$ with boundary $\partial\Omega$:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Laplace's equation}: $\nabla^2 u = \dfrac{\partial^2 u}{\partial x^2} + \dfrac{\partial^2 u}{\partial y^2} = 0$ \quad (no sources).
+  \item \textbf{Poisson's equation}: $\nabla^2 u = f(x,y)$ \quad (with a source term $f$).
+\end{itemize}
+Both require boundary conditions on $\partial\Omega$---typically Dirichlet ($u$ prescribed) or Neumann ($\partial u / \partial n$ prescribed).
+\end{keyconcept}
+
+For Laplace's equation, the solution at any interior point equals the \textbf{average} of the surrounding values. This ``mean value property'' is the physical intuition behind the numerical method.
+
+\subsection{The Five-Point Stencil}
+
+Discretize the domain on a square grid with spacing $h$. Replacing $u_{xx}$ and $u_{yy}$ with central differences and adding:
+
+\begin{keyconcept}[title={Five-Point Stencil}]
+\[
+\frac{u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1} - 4u_{i,j}}{h^2} = f_{i,j}.
+\]
+For Laplace's equation ($f = 0$), this becomes:
+\[
+u_{i,j} = \frac{1}{4}\big(u_{i-1,j} + u_{i+1,j} + u_{i,j-1} + u_{i,j+1}\big).
+\]
+Each interior value is the \textbf{average of its four neighbors}---the discrete version of the mean value property.
+\end{keyconcept}
+
+The five-point stencil uses the value at the center and its four immediate neighbors (left, right, below, above), forming a plus-shaped pattern.
+
+\subsection{A Worked Example}
+
+\begin{example}[title={Laplace's Equation on a Square}]
+Solve $\nabla^2 u = 0$ on $[0,1] \times [0,1]$ with boundary conditions:
+\[
+u(x, 0) = 0 \text{ (bottom)}, \quad u(x, 1) = 100 \text{ (top)}, \quad u(0, y) = u(1, y) = 0 \text{ (sides)}.
+\]
+
+Use $h = 1/3$ (so $N = 3$), giving $2 \times 2 = 4$ interior unknowns:
+
+\medskip
+\begin{center}
+\begin{tabular}{c|ccc}
+$y = 1$ & 100 & 100 & 100 \\
+\hline
+$y = 2/3$ & $u_3$ & $u_4$ & 0 \\
+$y = 1/3$ & $u_1$ & $u_2$ & 0 \\
+\hline
+$y = 0$ & 0 & 0 & 0 \\
+& $x = 1/3$ & $x = 2/3$ &
+\end{tabular}
+\end{center}
+\medskip
+
+(Left boundary also zero: $u(0, y) = 0$.)
+
+The five-point stencil at each interior point gives:
+\begin{align*}
+4u_1 - u_2 - u_3 &= 0, \\
+-u_1 + 4u_2 - u_4 &= 0, \\
+-u_1 + 4u_3 - u_4 &= 100, \\
+-u_2 - u_3 + 4u_4 &= 100.
+\end{align*}
+
+By the left-right symmetry of the boundary conditions: $u_1 = u_2$ and $u_3 = u_4$. Substituting:
+\begin{align*}
+3u_1 - u_3 &= 0 \quad \Longrightarrow \quad u_3 = 3u_1, \\
+-u_1 + 3u_3 &= 100 \quad \Longrightarrow \quad -u_1 + 9u_1 = 100.
+\end{align*}
+
+Solution: $u_1 = u_2 = 12.5$, $u_3 = u_4 = 37.5$.
+
+The temperature is 12.5 near the cold bottom and 37.5 near the hot top. Without the cold side boundaries, a linear temperature profile would give $33.3$ and $66.7$---the zero side boundaries pull the temperature significantly downward.
+\end{example}
+
+\subsection{Iterative Solution Methods}
+
+For fine grids, the linear system from the five-point stencil can have thousands or millions of unknowns. Direct solvers become impractical. Instead, we use \textbf{iterative methods}---the same Jacobi and Gauss--Seidel methods from Unit 3.
+
+\begin{keyconcept}[title={Jacobi Iteration for Laplace's Equation}]
+Starting from an initial guess, repeatedly update each interior point:
+\[
+u_{i,j}^{\text{new}} = \frac{1}{4}\big(u_{i-1,j}^{\text{old}} + u_{i+1,j}^{\text{old}} + u_{i,j-1}^{\text{old}} + u_{i,j+1}^{\text{old}}\big).
+\]
+Replace each value by the average of its four neighbors, using values from the \emph{previous} iteration.
+\end{keyconcept}
+
+\begin{example}[title={Jacobi Iterations}]
+Applying Jacobi iteration to our $4$-unknown Laplace problem, starting from $\mathbf{u}^{(0)} = (0, 0, 0, 0)$:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} crrrrr @{}}
+\toprule
+Iteration & $u_1$ & $u_2$ & $u_3$ & $u_4$ & Max error \\
+\midrule
+0 & 0.00 & 0.00 & 0.00 & 0.00 & 37.50 \\
+1 & 0.00 & 0.00 & 25.00 & 25.00 & 12.50 \\
+2 & 6.25 & 6.25 & 31.25 & 31.25 & 6.25 \\
+3 & 9.38 & 9.38 & 34.38 & 34.38 & 3.13 \\
+4 & 10.94 & 10.94 & 35.94 & 35.94 & 1.56 \\
+\midrule
+Exact & 12.50 & 12.50 & 37.50 & 37.50 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The error halves with each iteration, and the solution converges steadily toward the exact answer. Gauss--Seidel (using the latest available values) converges even faster.
+\end{example}
+
+\begin{takeaway}
+Elliptic PDEs are discretized with the five-point stencil, which expresses each interior value as the average of its four neighbors. The resulting large, sparse linear system is solved iteratively using Jacobi or Gauss--Seidel iteration. Each iteration updates every grid point using the averaging formula, and convergence is guaranteed for well-posed problems.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 10.6
+% ============================================================
+\section{Practical Considerations and Looking Ahead}
+
+\subsection{Mesh Refinement and Accuracy}
+
+The finite difference methods in this unit share a common theme: accuracy improves with grid refinement.
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+\textbf{PDE type} & \textbf{Scheme} & \textbf{Error order} \\
+\midrule
+Heat (explicit FTCS) & Forward time, centered space & $O(\Delta t) + O((\Delta x)^2)$ \\
+Heat (implicit BTCS) & Backward time, centered space & $O(\Delta t) + O((\Delta x)^2)$ \\
+Wave (explicit) & Centered time, centered space & $O((\Delta t)^2) + O((\Delta x)^2)$ \\
+Laplace/Poisson & Five-point stencil & $O(h^2)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For the heat equation, both explicit and implicit schemes are first-order in time. The \textbf{Crank--Nicolson method}---an average of FTCS and BTCS---achieves $O((\Delta t)^2) + O((\Delta x)^2)$: second-order in both space and time, and unconditionally stable. It is the standard choice in practice.
+
+\subsection{Beyond Finite Differences}
+
+Finite differences are simple and powerful, but they have limitations. For complex geometries (curved boundaries, irregular domains) or problems requiring high accuracy, other methods are preferred:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Finite element methods (FEM)} divide the domain into triangles or tetrahedra that can conform to complex shapes. They are the dominant method in structural mechanics, heat transfer, and many other fields.
+
+  \item \textbf{Finite volume methods (FVM)} discretize the domain into control volumes and enforce conservation laws directly. They are the standard in computational fluid dynamics.
+
+  \item \textbf{Spectral methods} represent the solution as a sum of basis functions (e.g., Fourier series or Chebyshev polynomials). They achieve extremely high accuracy for smooth problems.
+\end{itemize}
+
+Each of these methods builds on the same core ideas we have studied: discretization, approximation of derivatives, assembly of algebraic systems, and iterative solution. The finite difference foundation from this bootcamp provides the conceptual framework for understanding all of them.
+
+\subsection{What Comes Next}
+
+This unit---and this bootcamp---has covered the essential landscape of numerical analysis at the undergraduate level. From floating-point arithmetic (Unit 1) to PDEs (Unit 10), we have built a progression:
+
+\begin{center}
+\begin{tabular}{@{} cl @{}}
+\toprule
+\textbf{Units} & \textbf{Theme} \\
+\midrule
+1 & Foundations: how computers represent and manipulate numbers \\
+2--3 & Solving equations: roots and linear systems \\
+4--5 & Approximating functions: interpolation and curve fitting \\
+6--7 & Calculus on a grid: differentiation and integration \\
+8--10 & Differential equations: ODEs, BVPs, and PDEs \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each topic built on the ones before it. Finite differences for PDEs (this unit) rely on the stencils from Unit 6, the linear system solvers from Unit 3, the iterative methods from Unit 3, and the stability ideas from Unit 8. The bootcamp was designed so that by the time you reach PDEs, every tool you need has already been introduced.
+
+\begin{takeaway}
+Finite differences provide a simple, powerful framework for solving PDEs, with accuracy controlled by the grid spacing. For complex geometries or higher accuracy, finite element, finite volume, and spectral methods extend the core ideas. This bootcamp has covered the essential landscape of numerical analysis---from number representation to PDEs---building each topic on the foundations laid by earlier units.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 10 Summary}
+\addcontentsline{toc}{section}{Unit 10 Summary}
+
+This unit introduced the numerical solution of partial differential equations, the final and most powerful application of the techniques developed throughout this bootcamp.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{PDEs} involve functions of multiple variables and fall into three classic types: parabolic (diffusion), hyperbolic (waves), and elliptic (equilibrium). Each type has distinct physical behavior and numerical requirements.
+
+  \item \textbf{Finite differences in 2D} extend the one-dimensional stencils to grids in space-time or space-space. The mesh ratio $r$ governs stability.
+
+  \item \textbf{The heat equation} (parabolic) is solved by marching in time. The explicit FTCS scheme requires $r \leq 1/2$ for stability; the implicit BTCS scheme is unconditionally stable but requires solving a tridiagonal system per step.
+
+  \item \textbf{The wave equation} (hyperbolic) uses an explicit scheme requiring two previous time levels. The CFL condition $r \leq 1$ ensures stability. At $r = 1$, the scheme is exact.
+
+  \item \textbf{Laplace's and Poisson's equations} (elliptic) are discretized with the five-point stencil. Each interior value equals the average of its four neighbors. The large sparse system is solved iteratively with Jacobi or Gauss--Seidel.
+
+  \item \textbf{Practical methods} include Crank--Nicolson (second-order in both space and time for the heat equation), finite elements (complex geometries), finite volumes (conservation laws), and spectral methods (high accuracy).
+\end{enumerate}
+
+\medskip
+The three PDE types at a glance:
+
+\begin{center}
+\begin{tabular}{@{} lccc @{}}
+\toprule
+& \textbf{Parabolic} & \textbf{Hyperbolic} & \textbf{Elliptic} \\
+\midrule
+Prototype & $u_t = \alpha u_{xx}$ & $u_{tt} = c^2 u_{xx}$ & $u_{xx} + u_{yy} = f$ \\
+Physics & Diffusion & Wave propagation & Equilibrium \\
+Time dependence & Yes (1st order) & Yes (2nd order) & None \\
+Stability limit & $r \leq 1/2$ & $r \leq 1$ & N/A (no time) \\
+Solution method & March in time & March in time & Solve global system \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With this unit, the Numerical Analysis Bootcamp is complete. The ten units have built a connected foundation: numbers $\to$ equations $\to$ functions $\to$ calculus $\to$ differential equations. Every topic in numerical analysis rests on these building blocks.
+
+\end{document}

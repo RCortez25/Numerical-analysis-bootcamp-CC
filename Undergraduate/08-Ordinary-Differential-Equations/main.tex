@@ -1,0 +1,685 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 8: Ordinary Differential Equations}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 8 \\[0.3cm]}
+{\LARGE Ordinary Differential Equations \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+How do we solve $y' = f(t, y)$ when no formula exists?\\
+Step by step, from Euler's simple tangent line\\
+to the powerful Runge--Kutta methods.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 8.1
+% ============================================================
+\section{The Initial Value Problem}
+
+\subsection{What Is an ODE?}
+
+An \textbf{ordinary differential equation} (ODE) is an equation that involves an unknown function and its derivatives with respect to a single independent variable. In the simplest and most common setting:
+
+\begin{keyconcept}[title={The Initial Value Problem (IVP)}]
+Given a function $f(t, y)$, find $y(t)$ satisfying
+\[
+y'(t) = f(t, y(t)), \qquad y(t_0) = y_0.
+\]
+The equation $y' = f(t,y)$ tells us the \textbf{slope} of the unknown function at every point. The \textbf{initial condition} $y(t_0) = y_0$ pins down which particular solution we want.
+\end{keyconcept}
+
+ODEs are everywhere in science and engineering:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Population growth:} $y' = ry$ (exponential growth with rate $r$).
+  \item \textbf{Radioactive decay:} $y' = -\lambda y$ (exponential decay).
+  \item \textbf{Newton's law of cooling:} $y' = -k(y - T_{\text{env}})$.
+  \item \textbf{Mechanics:} $ma = F$ is a second-order ODE $y'' = F/m$.
+  \item \textbf{Circuits:} $L\,dI/dt + RI = V(t)$.
+\end{itemize}
+
+\subsection{Why We Need Numerical Methods}
+
+In a first course on differential equations, you learn techniques for solving certain types of ODEs exactly: separation of variables, integrating factors, undetermined coefficients, variation of parameters. These methods are elegant---and cover only a tiny fraction of the ODEs that arise in practice.
+
+\begin{warning}
+The vast majority of ODEs encountered in real applications \textbf{cannot be solved in closed form}. Even simple-looking equations like $y' = t^2 + y^2$ have no elementary solution. Numerical methods are not a last resort---they are the primary tool.
+\end{warning}
+
+\subsection{The Idea: Stepping Forward}
+
+Here is the key insight behind all numerical ODE methods:
+
+\begin{keyconcept}
+The ODE $y' = f(t,y)$ tells us the \textbf{slope} of $y$ at any point where we know $t$ and $y$. Starting from the known initial condition $(t_0, y_0)$, we can:
+\begin{enumerate}
+  \item Compute the slope at the current point.
+  \item Take a small step forward in $t$.
+  \item Use the slope to estimate where $y$ has moved to.
+  \item Repeat from the new point.
+\end{enumerate}
+This produces a sequence of approximations $y_0, y_1, y_2, \ldots$ at times $t_0, t_1, t_2, \ldots$ that traces out the solution curve.
+\end{keyconcept}
+
+The different numerical methods we will study all follow this pattern. They differ in \emph{how} they use the slope information to take each step---and this determines their accuracy and efficiency.
+
+\begin{takeaway}
+An initial value problem asks us to find a function $y(t)$ given its derivative $y' = f(t,y)$ and a starting value $y(t_0) = y_0$. Since most ODEs have no closed-form solution, we solve them numerically by stepping forward from the initial condition, using the slope to guide each step.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 8.2
+% ============================================================
+\section{Euler's Method}
+
+Euler's method is the simplest numerical ODE solver. It is rarely used in practice for serious computation, but it is the foundation upon which all more sophisticated methods are built.
+
+\subsection{Derivation from the Tangent Line}
+
+At the current point $(t_n, y_n)$, the ODE tells us the slope: $y'(t_n) = f(t_n, y_n)$. The tangent line at this point is:
+\[
+y(t) \approx y_n + (t - t_n)\,f(t_n, y_n).
+\]
+
+Follow this tangent line for one step of size $h$ to $t_{n+1} = t_n + h$:
+
+\begin{keyconcept}[title={Euler's Method}]
+\[
+y_{n+1} = y_n + h\,f(t_n, y_n), \qquad n = 0, 1, 2, \ldots
+\]
+Starting from $y_0$, each step advances the solution by following the tangent line for a distance $h$. This requires \textbf{one function evaluation per step}.
+\end{keyconcept}
+
+The idea is beautifully simple: if you know where you are and which direction you are heading, walk a small step in that direction.
+
+\subsection{Step-by-Step Algorithm}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Input:} $f(t,y)$, initial condition $(t_0, y_0)$, step size $h$, number of steps $N$.
+  \item \textbf{For} $n = 0, 1, 2, \ldots, N-1$:
+  \begin{enumerate}
+    \item Compute the slope: $k = f(t_n, y_n)$.
+    \item Update: $y_{n+1} = y_n + h \cdot k$.
+    \item Advance time: $t_{n+1} = t_n + h$.
+  \end{enumerate}
+  \item \textbf{Output:} Pairs $(t_0, y_0), (t_1, y_1), \ldots, (t_N, y_N)$.
+\end{enumerate}
+
+\begin{example}[title={Euler's Method: Exponential Growth}]
+Solve $y' = y$, $y(0) = 1$, on $[0, 1]$ with $h = 0.25$ (so $N = 4$ steps).
+
+Here $f(t, y) = y$. The exact solution is $y(t) = e^t$.
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} ccccr @{}}
+\toprule
+$n$ & $t_n$ & $y_n$ (Euler) & $y(t_n)$ (Exact) & Error \\
+\midrule
+0 & 0.00 & 1.00000 & 1.00000 & 0.00000 \\
+1 & 0.25 & 1.25000 & 1.28403 & 0.03403 \\
+2 & 0.50 & 1.56250 & 1.64872 & 0.08622 \\
+3 & 0.75 & 1.95313 & 2.11700 & 0.16388 \\
+4 & 1.00 & 2.44141 & 2.71828 & 0.27687 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Each step:
+\begin{align*}
+y_1 &= 1.00000 + 0.25 \times 1.00000 = 1.25000 \\
+y_2 &= 1.25000 + 0.25 \times 1.25000 = 1.56250 \\
+y_3 &= 1.56250 + 0.25 \times 1.56250 = 1.95313 \\
+y_4 &= 1.95313 + 0.25 \times 1.95313 = 2.44141
+\end{align*}
+
+The final error is about $10\%$. Not great---but Euler's method is doing its job with a very simple idea and only 4 steps. The solution consistently \textbf{underestimates} because $y = e^t$ is convex and the tangent line always lies below a convex curve.
+\end{example}
+
+\subsection{Error Analysis}
+
+From the Taylor expansion $y(t_{n+1}) = y(t_n) + h\,y'(t_n) + \frac{h^2}{2}\,y''(\xi)$, the term that Euler's method drops is $\frac{h^2}{2}y''(\xi)$.
+
+\begin{keyconcept}[title={Euler's Method Error}]
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Local truncation error} (error in one step, assuming exact input): $O(h^2)$.
+  \item \textbf{Global truncation error} (accumulated error at the final time): $O(h)$.
+\end{itemize}
+Euler's method is a \textbf{first-order} method. Halving $h$ approximately halves the global error---but doubles the number of steps.
+\end{keyconcept}
+
+Why is the global error one order worse than the local error? Because we take $N = (b-a)/h$ steps, and $N$ grows as $1/h$. Roughly: $N$ errors of size $O(h^2)$ each accumulate to a total of $N \cdot O(h^2) = O(h)$.
+
+\begin{takeaway}
+Euler's method follows the tangent line at each step: $y_{n+1} = y_n + h\,f(t_n, y_n)$. It is first-order accurate ($O(h)$ global error). Simple and instructive, but too crude for most practical computation. Its value is conceptual: every better method is an improvement on this basic idea.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 8.3
+% ============================================================
+\section{Improved and Modified Euler Methods}
+
+Euler's method uses the slope only at the \textbf{beginning} of each interval. Intuitively, this is wasteful---the slope may change significantly over the step. Can we do better by sampling the slope at more than one point?
+
+\subsection{The Problem with Euler}
+
+Consider walking through a curved hallway. Euler's method is like looking at the direction you are facing at the doorway, then walking straight for a fixed distance with your eyes closed. You will miss the curve. A better strategy: take a tentative step, look at the new direction, then average the two directions to correct your path.
+
+\subsection{Heun's Method (Improved Euler)}
+
+Heun's method implements exactly this idea:
+
+\begin{keyconcept}[title={Heun's Method (Improved Euler)}]
+\begin{enumerate}
+  \item \textbf{Predict} (Euler step): $\tilde{y}_{n+1} = y_n + h\,f(t_n, y_n)$.
+  \item \textbf{Correct} (average two slopes):
+  \[
+  y_{n+1} = y_n + \frac{h}{2}\Big[f(t_n, y_n) + f(t_{n+1}, \tilde{y}_{n+1})\Big].
+  \]
+\end{enumerate}
+This uses two function evaluations per step and is called a \textbf{predictor-corrector} method.
+\end{keyconcept}
+
+The idea: use Euler's method to \emph{predict} where you will be at $t_{n+1}$, compute the slope there, then go back and take the step using the \emph{average} of the slopes at both ends of the interval. This is the same idea as the trapezoidal rule for integration---applied to the ODE.
+
+\subsection{The Midpoint Method (Modified Euler)}
+
+An alternative: instead of averaging slopes at both ends, take a half-step and use the slope at the \textbf{midpoint}:
+
+\begin{keyconcept}[title={Midpoint Method (Modified Euler)}]
+\begin{enumerate}
+  \item \textbf{Half-step}: $\tilde{y} = y_n + \frac{h}{2}\,f(t_n, y_n)$.
+  \item \textbf{Full step using midpoint slope}:
+  \[
+  y_{n+1} = y_n + h\,f\!\left(t_n + \frac{h}{2},\; \tilde{y}\right).
+  \]
+\end{enumerate}
+Also two function evaluations per step.
+\end{keyconcept}
+
+Both Heun's method and the midpoint method are \textbf{second-order} methods.
+
+\begin{example}[title={Heun's Method vs.\ Euler}]
+Solve $y' = y$, $y(0) = 1$, with $h = 0.5$ (just 2 steps to reach $t = 1$).
+
+\textbf{Euler's method} ($h = 0.5$):
+
+$y_1 = 1 + 0.5(1) = 1.5$, \quad $y_2 = 1.5 + 0.5(1.5) = 2.25$.
+
+Error at $t = 1$: $|2.71828 - 2.25| = 0.468$.
+
+\medskip
+\textbf{Heun's method} ($h = 0.5$):
+
+\textit{Step 1} ($t = 0 \to 0.5$):
+\begin{align*}
+\tilde{y}_1 &= 1 + 0.5(1) = 1.5 \quad \text{(predict)} \\
+y_1 &= 1 + \frac{0.5}{2}[1 + 1.5] = 1 + 0.25(2.5) = 1.625 \quad \text{(correct)}
+\end{align*}
+
+\textit{Step 2} ($t = 0.5 \to 1.0$):
+\begin{align*}
+\tilde{y}_2 &= 1.625 + 0.5(1.625) = 2.4375 \\
+y_2 &= 1.625 + 0.25[1.625 + 2.4375] = 1.625 + 0.25(4.0625) = 2.641
+\end{align*}
+
+Error at $t = 1$: $|2.71828 - 2.641| = 0.078$.
+
+\medskip
+Heun's error ($0.078$) is about \textbf{6 times smaller} than Euler's ($0.468$)---with the same step size and only twice the work per step.
+\end{example}
+
+\subsection{Error Analysis}
+
+\begin{keyconcept}[title={Second-Order Method Errors}]
+For both Heun's method and the midpoint method:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Local truncation error}: $O(h^3)$.
+  \item \textbf{Global truncation error}: $O(h^2)$.
+\end{itemize}
+Halving $h$ reduces the global error by a factor of $\sim 4$.
+\end{keyconcept}
+
+The improvement from $O(h)$ to $O(h^2)$ comes from using the extra slope evaluation to capture more of the solution's curvature. The cost: two function evaluations per step instead of one.
+
+\begin{takeaway}
+Heun's method (improved Euler) and the midpoint method (modified Euler) are second-order methods that use two slope evaluations per step. By sampling the slope at an additional point, they capture the solution's curvature and reduce the global error from $O(h)$ to $O(h^2)$. The predictor-corrector idea---estimate, then refine---is a powerful theme that recurs in more advanced methods.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 8.4
+% ============================================================
+\section{Runge--Kutta Methods}
+
+If two slope evaluations give us a second-order method, what happens with four? The answer is the celebrated \textbf{classical Runge--Kutta method} (RK4)---arguably the most widely used ODE solver in science and engineering.
+
+\subsection{The Classical Fourth-Order Runge--Kutta Method}
+
+\begin{keyconcept}[title={The Classical RK4 Method}]
+\begin{align*}
+k_1 &= f(t_n,\; y_n), \\
+k_2 &= f\!\left(t_n + \frac{h}{2},\; y_n + \frac{h}{2}\,k_1\right), \\
+k_3 &= f\!\left(t_n + \frac{h}{2},\; y_n + \frac{h}{2}\,k_2\right), \\
+k_4 &= f(t_n + h,\; y_n + h\,k_3), \\[6pt]
+y_{n+1} &= y_n + \frac{h}{6}\big(k_1 + 2k_2 + 2k_3 + k_4\big).
+\end{align*}
+This uses \textbf{four} function evaluations per step and achieves \textbf{fourth-order} accuracy.
+\end{keyconcept}
+
+\subsection{Intuition: A Weighted Average of Slopes}
+
+The four $k$-values represent slopes sampled at different points within the step:
+
+\begin{center}
+\begin{tabular}{@{} cl @{}}
+\toprule
+\textbf{Slope} & \textbf{Where it is evaluated} \\
+\midrule
+$k_1$ & Beginning of the interval \\
+$k_2$ & Midpoint, using $k_1$ to step there \\
+$k_3$ & Midpoint again, using the improved $k_2$ to step there \\
+$k_4$ & End of the interval, using $k_3$ to step there \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The final update $y_{n+1} = y_n + \frac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)$ takes a weighted average with weights $\frac{1}{6}, \frac{2}{6}, \frac{2}{6}, \frac{1}{6}$. Notice this is the same $1\text{-}2\text{-}2\text{-}1$ pattern as Simpson's rule! This is not a coincidence---RK4 is closely related to Simpson's rule applied to the integral form of the ODE.
+
+\begin{example}[title={RK4 in a Single Step}]
+Solve $y' = y$, $y(0) = 1$. Take a single step of $h = 1$ to approximate $y(1) = e \approx 2.71828$.
+
+\begin{align*}
+k_1 &= f(0, 1) = 1 \\
+k_2 &= f(0.5,\; 1 + 0.5 \times 1) = f(0.5,\; 1.5) = 1.5 \\
+k_3 &= f(0.5,\; 1 + 0.5 \times 1.5) = f(0.5,\; 1.75) = 1.75 \\
+k_4 &= f(1,\; 1 + 1 \times 1.75) = f(1,\; 2.75) = 2.75
+\end{align*}
+
+\[
+y_1 = 1 + \frac{1}{6}(1 + 2(1.5) + 2(1.75) + 2.75) = 1 + \frac{1}{6}(10.25) = 1 + 1.70833 = 2.70833.
+\]
+
+Error: $|2.71828 - 2.70833| = 0.00995$.
+
+With just \textbf{one step} (4 function evaluations), RK4 approximates $e$ to within $1\%$. Compare: Euler's method with 4 evaluations ($h = 0.25$, 4 steps) gives $y(1) = 2.44141$---an error of $0.277$, roughly \textbf{28 times worse}.
+\end{example}
+
+\subsection{Error and Convergence}
+
+\begin{keyconcept}[title={RK4 Error}]
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Local truncation error}: $O(h^5)$.
+  \item \textbf{Global truncation error}: $O(h^4)$.
+\end{itemize}
+Halving $h$ reduces the global error by a factor of $\sim 16$.
+\end{keyconcept}
+
+\subsection{Convergence Comparison: All Three Methods}
+
+To see the orders of accuracy in action, we solve $y' = y$, $y(0) = 1$, and compare the error at $t = 1$ for decreasing step sizes:
+
+\begin{center}
+\begin{tabular}{@{} crrrrrr @{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{Euler} ($O(h)$)} & \multicolumn{2}{c}{\textbf{Heun} ($O(h^2)$)} & \multicolumn{2}{c}{\textbf{RK4} ($O(h^4)$)} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+$h$ & Error & Ratio & Error & Ratio & Error & Ratio \\
+\midrule
+0.500 & $4.7\!\times\!10^{-1}$ & --- & $7.8\!\times\!10^{-2}$ & --- & $9.3\!\times\!10^{-4}$ & --- \\
+0.250 & $2.8\!\times\!10^{-1}$ & 1.7 & $2.3\!\times\!10^{-2}$ & 3.4 & $6.1\!\times\!10^{-5}$ & 15 \\
+0.125 & $1.5\!\times\!10^{-1}$ & 1.8 & $6.4\!\times\!10^{-3}$ & 3.6 & $3.9\!\times\!10^{-6}$ & 16 \\
+0.0625 & $8.0\!\times\!10^{-2}$ & 1.9 & $1.7\!\times\!10^{-3}$ & 3.8 & $2.5\!\times\!10^{-7}$ & 16 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The ratios confirm the theoretical orders: Euler's ratios approach \textbf{2} ($2^1$), Heun's approach \textbf{4} ($2^2$), and RK4's approach \textbf{16} ($2^4$). The practical difference is striking: at $h = 0.0625$, RK4 is \textbf{six orders of magnitude} more accurate than Euler.
+
+\begin{takeaway}
+The classical Runge--Kutta method (RK4) evaluates four slopes per step and achieves fourth-order global accuracy. Its weighted average $\frac{1}{6}(k_1 + 2k_2 + 2k_3 + k_4)$ mirrors Simpson's rule. RK4 is the workhorse of ODE solving: it offers an excellent balance between accuracy and computational cost, and is the default choice for non-stiff problems.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 8.5
+% ============================================================
+\section{Systems of ODEs and Higher-Order Equations}
+
+So far we have solved single first-order equations. But many important problems involve \textbf{systems} of coupled equations, or \textbf{higher-order} equations like $y'' + y = 0$. The good news: the methods we have learned apply directly, with a simple trick.
+
+\subsection{Converting Higher-Order ODEs to Systems}
+
+A second-order ODE involves $y''$. The standard technique is to introduce new variables to reduce it to a system of first-order ODEs.
+
+\begin{keyconcept}[title={Reduction to a First-Order System}]
+To convert a second-order ODE $y'' = g(t, y, y')$:
+\begin{enumerate}
+  \item Let $u_1 = y$ (the original unknown) and $u_2 = y'$ (its derivative).
+  \item Then $u_1' = u_2$ and $u_2' = g(t, u_1, u_2)$.
+\end{enumerate}
+This gives a system of two first-order ODEs. The same idea works for any order: an $n$-th order ODE becomes a system of $n$ first-order equations.
+\end{keyconcept}
+
+\begin{example}[title={The Harmonic Oscillator}]
+The equation $y'' + y = 0$ with $y(0) = 0$, $y'(0) = 1$ models a simple harmonic oscillator. The exact solution is $y(t) = \sin t$.
+
+\textbf{Reduction:} Let $u_1 = y$ and $u_2 = y'$. Then:
+\[
+u_1' = u_2, \qquad u_2' = -u_1, \qquad u_1(0) = 0, \quad u_2(0) = 1.
+\]
+We now have a system of two first-order ODEs in the unknowns $u_1(t)$ and $u_2(t)$.
+\end{example}
+
+\subsection{Applying Euler's Method to Systems}
+
+For a system with state vector $\mathbf{u} = (u_1, u_2, \ldots)$ and derivative $\mathbf{u}' = \mathbf{F}(t, \mathbf{u})$, Euler's method is:
+\[
+\mathbf{u}_{n+1} = \mathbf{u}_n + h\,\mathbf{F}(t_n, \mathbf{u}_n).
+\]
+
+The formula is identical---just replace scalars with vectors. The same applies to Heun's method, RK4, and every other method we have studied.
+
+\begin{example}[title={Euler on the Harmonic Oscillator}]
+Solve the harmonic oscillator system $u_1' = u_2$, $u_2' = -u_1$ with $h = 0.5$:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} crrcrr @{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{Euler}} & & \multicolumn{2}{c}{\textbf{Exact}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){5-6}
+$t$ & $u_1$ ($\approx y$) & $u_2$ ($\approx y'$) & & $\sin t$ & $\cos t$ \\
+\midrule
+0.0 & 0.000 & 1.000 & & 0.000 & 1.000 \\
+0.5 & 0.500 & 1.000 & & 0.479 & 0.878 \\
+1.0 & 1.000 & 0.750 & & 0.841 & 0.540 \\
+1.5 & 1.375 & 0.250 & & 0.997 & 0.071 \\
+2.0 & 1.500 & $-0.438$ & & 0.909 & $-0.416$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Sample computation at $t = 0.5$:
+\begin{align*}
+u_1 &= 0 + 0.5 \times (1) = 0.500 \\
+u_2 &= 1 + 0.5 \times (-0) = 1.000
+\end{align*}
+
+The errors grow with each step. Notice something else: the exact solution stays on the unit circle ($\sin^2 t + \cos^2 t = 1$), but Euler's solution \textbf{spirals outward}---at $t = 2$, the radius $\sqrt{1.5^2 + 0.438^2} = 1.563 > 1$. Euler's method does not conserve energy. This is a well-known shortcoming, and it motivates the use of higher-order methods for oscillatory problems.
+\end{example}
+
+\subsection{RK4 for Systems}
+
+RK4 extends to systems in exactly the same way. For the system $\mathbf{u}' = \mathbf{F}(t, \mathbf{u})$:
+
+\begin{align*}
+\mathbf{k}_1 &= \mathbf{F}(t_n, \mathbf{u}_n), \\
+\mathbf{k}_2 &= \mathbf{F}(t_n + \tfrac{h}{2}, \mathbf{u}_n + \tfrac{h}{2}\mathbf{k}_1), \\
+\mathbf{k}_3 &= \mathbf{F}(t_n + \tfrac{h}{2}, \mathbf{u}_n + \tfrac{h}{2}\mathbf{k}_2), \\
+\mathbf{k}_4 &= \mathbf{F}(t_n + h, \mathbf{u}_n + h\,\mathbf{k}_3), \\
+\mathbf{u}_{n+1} &= \mathbf{u}_n + \frac{h}{6}(\mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4).
+\end{align*}
+
+Each $\mathbf{k}_i$ is now a \textbf{vector} of slopes, but the structure is identical to the scalar case.
+
+\begin{takeaway}
+Any higher-order ODE can be converted to a system of first-order ODEs by introducing new variables for each derivative. All numerical methods (Euler, Heun, RK4) apply directly to systems---simply replace scalars with vectors. The ability to handle systems is what makes these methods so powerful: virtually any ODE or system of ODEs can be solved with the same code.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 8.6
+% ============================================================
+\section{Step Size and Stability}
+
+So far, we have focused on \emph{accuracy}: how does the error depend on $h$? But there is another crucial question: \emph{does the numerical solution behave qualitatively like the true solution at all?} This is the question of \textbf{stability}.
+
+\subsection{What Happens When $h$ Is Too Large?}
+
+Consider the simple decay equation:
+
+\begin{example}[title={Stability of Euler's Method}]
+$y' = -10y$, $y(0) = 1$. The exact solution is $y(t) = e^{-10t}$, which decays smoothly to zero.
+
+Euler's method gives: $y_{n+1} = y_n + h(-10 y_n) = y_n(1 - 10h)$.
+
+The factor $(1 - 10h)$ is the \textbf{amplification factor}. What happens depends on its magnitude:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} clll @{}}
+\toprule
+$h$ & $1 - 10h$ & Behavior & Verdict \\
+\midrule
+0.10 & $0.0$ & Jumps to 0 in one step & Stable \\
+0.15 & $-0.5$ & Alternating sign, decaying & Stable \\
+0.19 & $-0.9$ & Slow oscillating decay & Stable \\
+0.20 & $-1.0$ & Alternates $+1, -1, +1, \ldots$ forever & Marginal \\
+0.25 & $-1.5$ & $1, -1.5, 2.25, -3.375, \ldots$ Blows up! & \textbf{Unstable} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The solution should decay to zero, but with $h = 0.25$ it blows up exponentially! The numerical method is \textbf{unstable} for this step size.
+\end{example}
+
+\subsection{The Stability Condition}
+
+To understand stability, we study the \textbf{test equation} $y' = \lambda y$, where $\lambda$ is a (possibly complex) constant with $\text{Re}(\lambda) < 0$ (so the exact solution decays).
+
+\begin{keyconcept}[title={Stability Condition for Euler's Method}]
+Euler's method applied to $y' = \lambda y$ gives $y_{n+1} = (1 + h\lambda)\,y_n$.
+
+The numerical solution decays (is stable) if and only if
+\[
+|1 + h\lambda| \leq 1.
+\]
+For real $\lambda < 0$, this requires $\displaystyle 0 < h < \frac{2}{|\lambda|}$.
+\end{keyconcept}
+
+This means more rapidly decaying problems (larger $|\lambda|$) require \textbf{smaller step sizes} just to keep the method stable---even if the solution itself is extremely smooth.
+
+\subsection{Stability Regions}
+
+The set of values $h\lambda$ for which a method is stable is called its \textbf{stability region} in the complex $h\lambda$-plane.
+
+\begin{keyconcept}[title={Stability Regions}]
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Euler's method:} the disk $|1 + h\lambda| \leq 1$, i.e., a circle of radius 1 centered at $-1$ in the $h\lambda$-plane. Along the negative real axis, this covers $-2 \leq h\lambda \leq 0$.
+  \item \textbf{RK4:} a much larger stability region, extending to about $h\lambda \approx -2.8$ along the negative real axis.
+  \item \textbf{Higher-order methods} generally have larger stability regions.
+\end{itemize}
+\end{keyconcept}
+
+\subsection{Stiff Equations: A First Look}
+
+Some problems have components that decay at vastly different rates. Consider a system where one component decays with $\lambda_1 = -1$ (slow) and another with $\lambda_2 = -1000$ (fast).
+
+\begin{warning}[title={Stiff Equations}]
+A \textbf{stiff} equation is one where stability---not accuracy---dictates the step size. Even though the fast transient dies out quickly and the solution thereafter varies slowly, an explicit method like Euler or RK4 must use $h < 2/|\lambda_{\max}|$ to remain stable. This forces thousands of tiny steps to cover a time interval where the solution barely changes.
+
+For the example above, Euler's method requires $h < 0.002$ even if the interesting dynamics happen on a timescale of order $1$.
+\end{warning}
+
+The solution: \textbf{implicit methods} like the backward Euler method, which replaces $f(t_n, y_n)$ with $f(t_{n+1}, y_{n+1})$:
+\[
+y_{n+1} = y_n + h\,f(t_{n+1}, y_{n+1}).
+\]
+Applied to $y' = \lambda y$, this gives $y_{n+1} = y_n/(1 - h\lambda)$. The amplification factor $1/(1-h\lambda)$ satisfies $|1/(1-h\lambda)| < 1$ for \emph{all} $h > 0$ when $\text{Re}(\lambda) < 0$. This means backward Euler is \textbf{unconditionally stable}---it never blows up, regardless of step size. The price: each step requires solving an equation (or system) for $y_{n+1}$.
+
+\subsection{Adaptive Step Size}
+
+In practice, we rarely want to choose $h$ manually. Modern ODE solvers use \textbf{adaptive step size control}: they automatically adjust $h$ at each step to keep the estimated error within a user-specified tolerance.
+
+\begin{keyconcept}[title={Adaptive Step Size (Basic Idea)}]
+\begin{enumerate}
+  \item Advance one step with a method of order $p$ (e.g., RK4) to get $y_{n+1}$.
+  \item Advance the same step with a method of order $p+1$ (e.g., RK5) to get $\hat{y}_{n+1}$.
+  \item Estimate the local error: $\text{err} \approx |y_{n+1} - \hat{y}_{n+1}|$.
+  \item If $\text{err} < \text{tol}$: accept the step, try a larger $h$ next time.
+  \item If $\text{err} > \text{tol}$: reject the step, shrink $h$, and redo it.
+\end{enumerate}
+This is the strategy behind \textbf{RK45} (Dormand--Prince), the algorithm used in MATLAB's \texttt{ode45} and similar solvers.
+\end{keyconcept}
+
+\begin{takeaway}
+Stability determines whether a numerical solution qualitatively matches the true solution. Every explicit method has a maximum step size beyond which the solution blows up. Stiff problems---those with widely separated time scales---are especially challenging because stability, not accuracy, forces the use of tiny steps. Implicit methods (like backward Euler) are unconditionally stable and handle stiffness efficiently. Adaptive step size control automatically adjusts $h$ to balance accuracy and efficiency, and is the basis of all modern ODE solvers.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 8 Summary}
+\addcontentsline{toc}{section}{Unit 8 Summary}
+
+This unit developed the main tools for solving initial value problems $y' = f(t,y)$, $y(t_0) = y_0$.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{The initial value problem} prescribes the slope $y' = f(t,y)$ and a starting value. Most ODEs cannot be solved in closed form, so we step forward numerically.
+
+  \item \textbf{Euler's method} follows the tangent line: $y_{n+1} = y_n + h\,f(t_n,y_n)$. First-order ($O(h)$ global error). Simple but crude---the conceptual foundation for everything else.
+
+  \item \textbf{Heun's and midpoint methods} use two slope evaluations per step to achieve second-order accuracy ($O(h^2)$). The predictor-corrector idea---predict with Euler, correct by averaging slopes---is a recurring theme.
+
+  \item \textbf{RK4} evaluates four slopes per step and achieves fourth-order accuracy ($O(h^4)$). Its $\frac{1}{6}(k_1 + 2k_2 + 2k_3 + k_4)$ formula mirrors Simpson's rule. The workhorse of ODE solving.
+
+  \item \textbf{Systems and higher-order ODEs} are handled by converting to first-order form and applying the same methods with vector operations. This makes the methods universally applicable.
+
+  \item \textbf{Stability} limits the maximum step size for explicit methods. Stiff problems require implicit methods (e.g., backward Euler) that remain stable for any $h$. Adaptive step size control automatically balances accuracy and efficiency.
+\end{enumerate}
+
+\medskip
+The hierarchy of methods:
+
+\begin{center}
+\begin{tabular}{@{} lccc @{}}
+\toprule
+\textbf{Method} & \textbf{Evals/step} & \textbf{Global order} & \textbf{Best for} \\
+\midrule
+Euler & 1 & $O(h)$ & Teaching; starting point \\
+Heun / Midpoint & 2 & $O(h^2)$ & Quick estimates \\
+RK4 & 4 & $O(h^4)$ & General-purpose, non-stiff \\
+RK45 (adaptive) & 6 & $O(h^4)\text{--}O(h^5)$ & Production use \\
+Backward Euler & 1 (implicit) & $O(h)$ & Stiff problems \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Key theme: more slope evaluations per step $\to$ higher-order accuracy $\to$ far fewer total steps needed. RK4 with a modest step size routinely outperforms Euler by orders of magnitude.
+
+\end{document}
