@@ -1,0 +1,705 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 5: Curve Fitting and Least Squares}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 5 \\[0.3cm]}
+{\LARGE Curve Fitting and Least Squares \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+When data is noisy, passing a curve through every point\\
+is a mistake. Instead, find the curve that best fits\\
+the overall trend---the method of least squares.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 5.1
+% ============================================================
+\section{The Curve Fitting Problem}
+
+\subsection{From Interpolation to Fitting}
+
+In Unit 4 we studied interpolation: given data points, find a curve that passes \textbf{exactly} through every one. That is the right approach when the data is exact and trusted. But what if the data contains \textbf{noise}---measurement errors, sensor imprecision, random fluctuations?
+
+If we force a curve through every noisy data point, we are not capturing the underlying trend---we are \textbf{fitting the noise}. The result is a curve that wiggles wildly to accommodate random errors, and it will perform terribly at predicting new values.
+
+\begin{example}[title={Why Interpolation Fails on Noisy Data}]
+Suppose the true relationship is $y = 2x + 1$ (a straight line), but our measured data has random errors:
+
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & 0 & 1 & 2 & 3 & 4 \\
+\hline
+$y_i$ (true) & 1.0 & 3.0 & 5.0 & 7.0 & 9.0 \\
+$y_i$ (measured) & 1.2 & 2.7 & 5.3 & 6.8 & 9.4
+\end{tabular}
+\end{center}
+
+Interpolating the measured data with a degree-4 polynomial gives a curve that hits every noisy point but oscillates between them. The simple line $y \approx 2x + 1$ is clearly a better description of the underlying relationship.
+\end{example}
+
+\subsection{The Key Shift: Don't Match Every Point}
+
+Curve fitting takes a fundamentally different philosophy from interpolation:
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+& \textbf{Interpolation} & \textbf{Curve Fitting} \\
+\midrule
+Goal & $p(x_i) = y_i$ exactly & $p(x_i) \approx y_i$ on average \\
+Data assumed & Exact, noise-free & Noisy, imprecise \\
+Number of params & Usually $=$ number of points & Much $<$ number of points \\
+Risk & Fitting noise & Underfitting (missing the trend) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Overdetermined Systems}
+
+In curve fitting, we typically have \textbf{more data points than model parameters}. For example, fitting a straight line $y = a_0 + a_1 x$ to 100 data points means choosing 2 parameters to satisfy 100 conditions. This gives an \textbf{overdetermined system}---more equations than unknowns---which generically has no exact solution.
+
+In matrix form, we seek $\mathbf{a}$ such that $A\mathbf{a} \approx \mathbf{y}$, where $A$ is a tall, thin matrix (many rows, few columns). Since an exact solution typically does not exist, we need a precise notion of ``best approximate solution.'' That is what least squares provides.
+
+\begin{takeaway}
+Curve fitting is the right approach when data is noisy. Instead of passing through every point, we choose a simple model (with fewer parameters than data points) and find the parameters that make the model as close to the data as possible. The standard way to define ``as close as possible'' is the method of least squares.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 5.2
+% ============================================================
+\section{Least Squares: The Core Idea}
+
+\subsection{Residuals}
+
+Suppose we have $m$ data points $(x_1, y_1), \ldots, (x_m, y_m)$ and a model function $p(x; \mathbf{a})$ with parameters $\mathbf{a} = (a_0, a_1, \ldots, a_n)^T$ where $n < m$ (fewer parameters than data points).
+
+The \textbf{residual} at data point $i$ is the difference between the measured value and the model's prediction:
+\[
+r_i = y_i - p(x_i; \mathbf{a}).
+\]
+
+A perfect fit would have all residuals equal to zero. With noisy data, that is impossible (and undesirable), so we want to make the residuals collectively ``as small as possible.''
+
+\subsection{Minimizing the Sum of Squared Residuals}
+
+The \textbf{method of least squares} chooses the parameters $\mathbf{a}$ that minimize the \textbf{sum of squared residuals}:
+
+\begin{keyconcept}[title={The Least Squares Objective}]
+\[
+S(\mathbf{a}) = \sum_{i=1}^{m} r_i^2 = \sum_{i=1}^{m} \big(y_i - p(x_i; \mathbf{a})\big)^2.
+\]
+Find $\mathbf{a}$ that minimizes $S(\mathbf{a})$.
+\end{keyconcept}
+
+In words: we square each residual (so positive and negative residuals are treated equally), sum them all up, and minimize. The result is the parameter set that gives the ``best overall fit'' to the data.
+
+\subsection{Why Squared? Why Not Absolute Value?}
+
+A natural question: why minimize $\sum r_i^2$ instead of $\sum |r_i|$? Several reasons:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Differentiability.} The function $r^2$ is smooth (differentiable everywhere), while $|r|$ has a corner at $r = 0$. This makes least squares much easier to solve---we can use calculus (set derivatives to zero).
+
+  \item \textbf{Penalizes large residuals more.} Squaring amplifies big deviations: a residual of 4 contributes $16$ to the sum, while four residuals of 1 each contribute only $4$. This makes least squares sensitive to outliers (which can be a pro or a con).
+
+  \item \textbf{Beautiful theory.} Least squares leads to linear systems of equations (the ``normal equations''), connects to projections in linear algebra, and has deep statistical foundations (Gauss--Markov theorem).
+\end{enumerate}
+
+\subsection{Geometric Intuition: Projections}
+
+There is a beautiful geometric picture behind least squares. In the language of linear algebra:
+
+\begin{itemize}[leftmargin=2em]
+  \item The data vector $\mathbf{y} = (y_1, \ldots, y_m)^T$ lives in $\mathbb{R}^m$.
+  \item The model predictions $A\mathbf{a}$ form a subspace of $\mathbb{R}^m$ (spanned by the columns of $A$).
+  \item The least squares solution finds the point in this subspace that is \textbf{closest to $\mathbf{y}$}---the \textbf{orthogonal projection} of $\mathbf{y}$ onto the column space of $A$.
+\end{itemize}
+
+The residual vector $\mathbf{r} = \mathbf{y} - A\mathbf{a}$ is \textbf{perpendicular} to the column space at the optimal $\mathbf{a}$. This perpendicularity condition is precisely what gives us the normal equations (Section 5.3).
+
+\begin{takeaway}
+Least squares minimizes the sum of squared residuals $S = \sum (y_i - p(x_i))^2$. Squaring ensures differentiability and penalizes large deviations. Geometrically, the solution is the orthogonal projection of the data onto the space of model predictions.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 5.3
+% ============================================================
+\section{Linear Least Squares}
+
+We start with the simplest and most important case: fitting a \textbf{straight line} to data. This is \textbf{linear regression}---probably the most widely used statistical tool in all of science.
+
+\subsection{The Model: A Straight Line}
+
+We want to fit the model
+\[
+p(x) = a_0 + a_1 x
+\]
+to data $(x_1, y_1), \ldots, (x_m, y_m)$ where $m > 2$ (more points than parameters).
+
+The objective is to minimize:
+\[
+S(a_0, a_1) = \sum_{i=1}^{m} (y_i - a_0 - a_1 x_i)^2.
+\]
+
+\subsection{Deriving the Normal Equations}
+
+To minimize $S$, we take partial derivatives with respect to $a_0$ and $a_1$ and set them to zero:
+
+\begin{align*}
+\frac{\partial S}{\partial a_0} &= -2\sum_{i=1}^{m}(y_i - a_0 - a_1 x_i) = 0, \\[6pt]
+\frac{\partial S}{\partial a_1} &= -2\sum_{i=1}^{m}x_i(y_i - a_0 - a_1 x_i) = 0.
+\end{align*}
+
+Rearranging, we get the \textbf{normal equations} for linear regression:
+
+\begin{keyconcept}[title={Normal Equations (Linear Fit)}]
+\[
+\begin{pmatrix}
+m & \displaystyle\sum x_i \\[6pt]
+\displaystyle\sum x_i & \displaystyle\sum x_i^2
+\end{pmatrix}
+\begin{pmatrix} a_0 \\ a_1 \end{pmatrix}
+=
+\begin{pmatrix}
+\displaystyle\sum y_i \\[6pt]
+\displaystyle\sum x_i y_i
+\end{pmatrix}.
+\]
+This is a $2 \times 2$ linear system that can be solved directly for $a_0$ (the intercept) and $a_1$ (the slope).
+\end{keyconcept}
+
+\begin{example}[title={Fitting a Line: Complete Worked Example}]
+Fit a straight line to the data:
+
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & 1 & 2 & 3 & 4 & 5 \\
+\hline
+$y_i$ & 2.1 & 3.9 & 6.2 & 7.8 & 10.1
+\end{tabular}
+\end{center}
+
+\textbf{Step 1: Compute the sums.} With $m = 5$:
+\begin{align*}
+\sum x_i &= 1+2+3+4+5 = 15, \\
+\sum x_i^2 &= 1+4+9+16+25 = 55, \\
+\sum y_i &= 2.1+3.9+6.2+7.8+10.1 = 30.1, \\
+\sum x_i y_i &= (1)(2.1)+(2)(3.9)+(3)(6.2)+(4)(7.8)+(5)(10.1) = 109.3.
+\end{align*}
+
+\textbf{Step 2: Set up and solve the normal equations.}
+\[
+\begin{pmatrix} 5 & 15 \\ 15 & 55 \end{pmatrix}
+\begin{pmatrix} a_0 \\ a_1 \end{pmatrix} =
+\begin{pmatrix} 30.1 \\ 109.3 \end{pmatrix}.
+\]
+
+Using Cramer's rule or elimination:
+\begin{align*}
+\text{Determinant} &= 5(55) - 15(15) = 275 - 225 = 50. \\
+a_0 &= \frac{55(30.1) - 15(109.3)}{50} = \frac{1655.5 - 1639.5}{50} = \frac{16}{50} = 0.32. \\
+a_1 &= \frac{5(109.3) - 15(30.1)}{50} = \frac{546.5 - 451.5}{50} = \frac{95}{50} = 1.90.
+\end{align*}
+
+\textbf{Result:} The best-fit line is $p(x) = 0.32 + 1.90x$.
+
+\textbf{Step 3: Check.} The predicted values and residuals:
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & 1 & 2 & 3 & 4 & 5 \\
+\hline
+$p(x_i)$ & 2.22 & 4.12 & 6.02 & 7.92 & 9.82 \\
+$r_i = y_i - p(x_i)$ & $-0.12$ & $-0.22$ & $0.18$ & $-0.12$ & $0.28$
+\end{tabular}
+\end{center}
+
+The residuals are small and roughly balanced between positive and negative---a sign of a good fit.
+\end{example}
+
+\subsection{The General Formulation: $A^T A \, \mathbf{a} = A^T \mathbf{b}$}
+
+For a linear model with any number of basis functions (not just a line), the least squares problem can be written in matrix form. If our model is:
+\[
+p(x) = a_0 \phi_0(x) + a_1 \phi_1(x) + \cdots + a_n \phi_n(x),
+\]
+where $\phi_0, \phi_1, \ldots, \phi_n$ are known functions (e.g., $1, x, x^2, \ldots$), then the system $A\mathbf{a} \approx \mathbf{y}$ has:
+\[
+A = \begin{pmatrix}
+\phi_0(x_1) & \phi_1(x_1) & \cdots & \phi_n(x_1) \\
+\phi_0(x_2) & \phi_1(x_2) & \cdots & \phi_n(x_2) \\
+\vdots & \vdots & \ddots & \vdots \\
+\phi_0(x_m) & \phi_1(x_m) & \cdots & \phi_n(x_m)
+\end{pmatrix}.
+\]
+
+The least squares solution satisfies the \textbf{normal equations}:
+
+\begin{keyconcept}[title={Normal Equations (General Form)}]
+\[
+A^T A \, \mathbf{a} = A^T \mathbf{y}.
+\]
+This is an $(n+1) \times (n+1)$ linear system---always square, always solvable (as long as $A$ has full column rank).
+\end{keyconcept}
+
+The matrix $A^T A$ is symmetric and positive definite (when $A$ has full column rank), so it can be solved efficiently by Gaussian elimination, LU decomposition, or specialized methods like the Cholesky factorization.
+
+\begin{takeaway}
+Linear least squares fits a straight line $a_0 + a_1 x$ to data by minimizing the sum of squared residuals. Setting derivatives to zero yields the normal equations---a small linear system. The general form $A^T A \, \mathbf{a} = A^T \mathbf{y}$ extends to any linear combination of basis functions.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 5.4
+% ============================================================
+\section{Polynomial Least Squares}
+
+A straight line is not always adequate. Sometimes the data clearly follows a curve, and we need a higher-degree polynomial. The least squares framework handles this seamlessly.
+
+\subsection{The Model: A Polynomial of Degree $n$}
+
+We fit:
+\[
+p(x) = a_0 + a_1 x + a_2 x^2 + \cdots + a_n x^n
+\]
+to $m > n+1$ data points. The basis functions are $\phi_k(x) = x^k$ for $k = 0, 1, \ldots, n$.
+
+The design matrix becomes the \textbf{Vandermonde-like matrix}:
+\[
+A = \begin{pmatrix}
+1 & x_1 & x_1^2 & \cdots & x_1^n \\
+1 & x_2 & x_2^2 & \cdots & x_2^n \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+1 & x_m & x_m^2 & \cdots & x_m^n
+\end{pmatrix},
+\]
+and the normal equations $A^T A \, \mathbf{a} = A^T \mathbf{y}$ are solved as before.
+
+\begin{example}[title={Fitting a Parabola}]
+Fit a quadratic $p(x) = a_0 + a_1 x + a_2 x^2$ to the data:
+
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & $-2$ & $-1$ & 0 & 1 & 2 \\
+\hline
+$y_i$ & 6.8 & 2.1 & 0.9 & 1.8 & 7.2
+\end{tabular}
+\end{center}
+
+The design matrix is:
+\[
+A = \begin{pmatrix}
+1 & -2 & 4 \\
+1 & -1 & 1 \\
+1 & 0 & 0 \\
+1 & 1 & 1 \\
+1 & 2 & 4
+\end{pmatrix}.
+\]
+
+Computing $A^T A$ and $A^T \mathbf{y}$:
+\[
+A^T A = \begin{pmatrix}
+5 & 0 & 10 \\
+0 & 10 & 0 \\
+10 & 0 & 34
+\end{pmatrix}, \qquad
+A^T \mathbf{y} = \begin{pmatrix}
+18.8 \\
+5.2 \\
+57.4
+\end{pmatrix}.
+\]
+
+Solving (note that $A^T A$ is nearly diagonal due to the symmetric node placement):
+\begin{align*}
+a_1 &= 5.2 / 10 = 0.52, \\
+5a_0 + 10a_2 &= 18.8, \\
+10a_0 + 34a_2 &= 57.4.
+\end{align*}
+From these: $a_0 = 0.76$ and $a_2 = 1.50$.
+
+\textbf{Result:} $p(x) = 0.76 + 0.52x + 1.50x^2$.
+
+This parabola captures the U-shaped trend of the data without being forced through every noisy point.
+\end{example}
+
+\subsection{How High Should the Degree Be?}
+
+This is one of the most important practical questions. Here is the dilemma:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Too low a degree:} The model cannot capture the true shape of the data (\textbf{underfitting}). The residuals are large and show systematic patterns.
+  \item \textbf{Too high a degree:} The model starts fitting the noise instead of the trend (\textbf{overfitting}). The residuals are small on the given data, but the model predicts poorly on new data.
+\end{itemize}
+
+\begin{warning}[title={The Danger of Overfitting}]
+With $m$ data points, you can always fit a polynomial of degree $m-1$ that passes through \textbf{every} point ($S = 0$). But this is interpolation in disguise---and with noisy data, it produces a wildly oscillating curve that is worse than useless for prediction.
+
+The fact that $S = 0$ does \textbf{not} mean the fit is good. A model with a small but nonzero $S$ that captures the true trend is far more valuable.
+\end{warning}
+
+\subsection{Practical Guidelines for Choosing Degree}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Start low.} Try a line first. If the residuals show a clear pattern (e.g., curved), increase the degree.
+  \item \textbf{Look at the residuals.} Good residuals look random (no pattern). Systematic patterns suggest the model is missing something.
+  \item \textbf{Keep $n \ll m$.} A common rule: the degree should be much less than the number of data points. Having at least 3--5 data points per parameter is a reasonable minimum.
+  \item \textbf{Beware of diminishing returns.} Going from degree 1 to 2 often helps a lot. Going from degree 5 to 6 rarely helps and often hurts.
+\end{enumerate}
+
+\begin{takeaway}
+Polynomial least squares extends the straight-line fit to curves of any degree. The key practical challenge is choosing the right degree: high enough to capture the trend, low enough to avoid fitting noise. When in doubt, keep it simple.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 5.5
+% ============================================================
+\section{Linearizable Models}
+
+Not all relationships in nature are polynomial. Many phenomena follow exponential, power-law, or logarithmic patterns. The clever trick: \textbf{transform the data} so that a nonlinear model becomes a linear one, then use linear least squares.
+
+\subsection{Exponential Fit: $y = ae^{bx}$}
+
+Many growth and decay processes follow the model $y = ae^{bx}$. This is nonlinear in $a$ and $b$---but taking the natural logarithm of both sides:
+\[
+\ln y = \ln a + bx.
+\]
+
+If we define $Y = \ln y$ and $A_0 = \ln a$, this is a straight line: $Y = A_0 + bx$.
+
+\begin{keyconcept}[title={Linearization Strategy}]
+\begin{enumerate}
+  \item Transform the data: compute $Y_i = \ln y_i$ for each data point.
+  \item Fit a straight line to $(x_i, Y_i)$ using linear least squares.
+  \item Recover the original parameters: $b$ is the slope, $a = e^{A_0}$ where $A_0$ is the intercept.
+\end{enumerate}
+\end{keyconcept}
+
+\begin{example}[title={Exponential Fit}]
+A bacteria population is measured at several times:
+
+\begin{center}
+\begin{tabular}{c|ccccc}
+$t$ (hours) & 0 & 1 & 2 & 3 & 4 \\
+\hline
+$y$ (thousands) & 5.0 & 8.2 & 13.1 & 22.0 & 35.8
+\end{tabular}
+\end{center}
+
+\textbf{Step 1:} Transform: $Y_i = \ln y_i$.
+\begin{center}
+\begin{tabular}{c|ccccc}
+$t_i$ & 0 & 1 & 2 & 3 & 4 \\
+\hline
+$Y_i = \ln y_i$ & 1.609 & 2.104 & 2.573 & 3.091 & 3.578
+\end{tabular}
+\end{center}
+
+\textbf{Step 2:} Fit a line to $(t_i, Y_i)$. Using the normal equations: slope $b \approx 0.492$, intercept $A_0 \approx 1.619$.
+
+\textbf{Step 3:} Recover: $a = e^{1.619} \approx 5.05$, so the model is $y \approx 5.05\,e^{0.492t}$.
+
+This tells us the population roughly doubles every $\ln 2 / 0.492 \approx 1.41$ hours.
+\end{example}
+
+\subsection{Power-Law Fit: $y = ax^b$}
+
+Power-law relationships are common in physics, biology, and economics: $y = ax^b$. Taking logarithms:
+\[
+\ln y = \ln a + b \ln x.
+\]
+
+Setting $X = \ln x$ and $Y = \ln y$, this becomes $Y = A_0 + bX$---again a straight line, but in log-log space.
+
+\begin{example}[title={Power-Law Fit}]
+The metabolic rate $R$ of animals scales with body mass $M$ roughly as $R = aM^b$. Given data:
+
+\begin{center}
+\begin{tabular}{c|cccc}
+$M$ (kg) & 0.1 & 1 & 10 & 100 \\
+\hline
+$R$ (watts) & 0.8 & 4.1 & 22 & 110
+\end{tabular}
+\end{center}
+
+Transform to log-log: plot $\ln R$ vs.\ $\ln M$ and fit a line.
+
+The result yields $b \approx 0.73$ (close to the famous Kleiber's law exponent of $3/4$) and $a \approx 4.0$:
+\[
+R \approx 4.0 \, M^{0.73}.
+\]
+\end{example}
+
+\subsection{Logarithmic Fit: $y = a + b \ln x$}
+
+Some data follows a logarithmic trend. This model is \textbf{already linear} in $a$ and $b$---just set $X = \ln x$ and fit $y = a + bX$. No transformation of $y$ is needed.
+
+\subsection{Summary of Linearizable Models}
+
+\begin{center}
+\begin{tabular}{@{} llll @{}}
+\toprule
+\textbf{Model} & \textbf{Transformation} & \textbf{Linear form} & \textbf{Recover params} \\
+\midrule
+$y = ae^{bx}$ & $Y = \ln y$ & $Y = \ln a + bx$ & $a = e^{\text{intercept}}$ \\[4pt]
+$y = ax^b$ & $X = \ln x$, $Y = \ln y$ & $Y = \ln a + bX$ & $a = e^{\text{intercept}}$ \\[4pt]
+$y = a + b\ln x$ & $X = \ln x$ & $y = a + bX$ & Direct \\[4pt]
+$y = \dfrac{1}{a + bx}$ & $Y = 1/y$ & $Y = a + bx$ & Direct \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{warning}
+Linearization by taking logarithms changes the error structure. Minimizing $\sum(\ln y_i - \ln p_i)^2$ is \textbf{not} the same as minimizing $\sum(y_i - p_i)^2$. The linearized fit minimizes \textbf{relative} errors in $y$, which is often reasonable for exponential and power-law data (where values span many orders of magnitude), but you should be aware of this subtlety.
+\end{warning}
+
+\begin{takeaway}
+Many nonlinear models (exponential, power-law, logarithmic) can be transformed into linear models through appropriate substitutions. This lets us use the simple, reliable machinery of linear least squares to fit intrinsically nonlinear relationships---a powerful and widely used technique.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 5.6
+% ============================================================
+\section{Goodness of Fit}
+
+We have fit a model to data. But how do we know if the fit is any good? This section introduces tools for assessing fit quality.
+
+\subsection{Residual Analysis}
+
+The first and most important diagnostic: \textbf{look at the residuals} $r_i = y_i - p(x_i)$.
+
+\begin{keyconcept}[title={What Good Residuals Look Like}]
+If the model is appropriate for the data, the residuals should:
+\begin{enumerate}
+  \item Be \textbf{small} compared to the data values.
+  \item Be \textbf{randomly scattered}---no systematic pattern when plotted against $x$.
+  \item Be roughly \textbf{balanced} between positive and negative.
+\end{enumerate}
+\end{keyconcept}
+
+\textbf{Warning signs} in the residuals:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Curved pattern:} The model is too simple (e.g., fitting a line to parabolic data). Increase the degree or change the model type.
+  \item \textbf{Fan shape} (residuals grow with $x$): The variance of the data changes with $x$. The model may still be correct, but standard least squares is not optimal.
+  \item \textbf{One or two huge residuals:} Outliers. These disproportionately influence least squares because of the squaring.
+\end{itemize}
+
+\begin{example}[title={Reading the Residuals}]
+Returning to our linear fit $p(x) = 0.32 + 1.90x$ from Section 5.3:
+
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & 1 & 2 & 3 & 4 & 5 \\
+\hline
+$r_i$ & $-0.12$ & $-0.22$ & $0.18$ & $-0.12$ & $0.28$
+\end{tabular}
+\end{center}
+
+The residuals are small (all less than $0.3$), roughly balanced (mix of $+$ and $-$), and show no obvious pattern. This suggests the linear model is appropriate.
+
+If the residuals had been $(-0.5, -0.1, 0.3, 0.2, -0.4)$ with a clear curve, we might try a quadratic.
+\end{example}
+
+\subsection{The Coefficient of Determination ($R^2$)}
+
+The most popular single-number summary of fit quality is the \textbf{coefficient of determination}, $R^2$.
+
+\begin{keyconcept}[title={$R^2$: Coefficient of Determination}]
+\[
+R^2 = 1 - \frac{SS_{\mathrm{res}}}{SS_{\mathrm{tot}}},
+\]
+where:
+\begin{align*}
+SS_{\mathrm{res}} &= \sum_{i=1}^{m}(y_i - p(x_i))^2 \quad \text{(residual sum of squares --- what the model misses)}, \\[4pt]
+SS_{\mathrm{tot}} &= \sum_{i=1}^{m}(y_i - \bar{y})^2 \quad \text{(total sum of squares --- total variance in the data)}, \\[4pt]
+\bar{y} &= \frac{1}{m}\sum_{i=1}^{m} y_i \quad \text{(mean of the data)}.
+\end{align*}
+\end{keyconcept}
+
+\textbf{Interpretation:}
+\begin{itemize}[leftmargin=2em]
+  \item $R^2 = 1$: The model explains 100\% of the variation in the data. Perfect fit (usually means overfitting with noisy data).
+  \item $R^2 = 0$: The model explains none of the variation. It is no better than just predicting the mean $\bar{y}$ for every point.
+  \item $R^2 = 0.95$: The model explains 95\% of the variation. Usually considered very good.
+\end{itemize}
+
+\begin{example}[title={Computing $R^2$}]
+For our linear fit example:
+\begin{align*}
+\bar{y} &= 30.1 / 5 = 6.02. \\
+SS_{\mathrm{tot}} &= (2.1 - 6.02)^2 + (3.9 - 6.02)^2 + (6.2 - 6.02)^2 + (7.8 - 6.02)^2 + (10.1 - 6.02)^2 \\
+&= 15.37 + 4.49 + 0.03 + 3.17 + 16.65 = 39.71. \\
+SS_{\mathrm{res}} &= (-0.12)^2 + (-0.22)^2 + (0.18)^2 + (-0.12)^2 + (0.28)^2 \\
+&= 0.0144 + 0.0484 + 0.0324 + 0.0144 + 0.0784 = 0.188. \\
+R^2 &= 1 - \frac{0.188}{39.71} = 1 - 0.00473 = 0.9953.
+\end{align*}
+
+$R^2 \approx 0.995$: the linear model explains $99.5\%$ of the variation in the data. Excellent fit.
+\end{example}
+
+\subsection{When $R^2$ Can Be Misleading}
+
+\begin{warning}
+$R^2$ is useful but not infallible. Be aware of these pitfalls:
+\begin{itemize}
+  \item $R^2$ \textbf{always increases} (or stays the same) when you add more parameters. A degree-$m$ polynomial always has $R^2 = 1$ for $m+1$ data points---but this is overfitting, not a good model.
+  \item A high $R^2$ does not prove \textbf{causation}. Two unrelated variables can have a high $R^2$ by coincidence (spurious correlation).
+  \item $R^2$ does not detect \textbf{wrong model type}. A line fit to parabolic data can have a high $R^2$ yet be systematically wrong. Always check the residuals.
+\end{itemize}
+\end{warning}
+
+The bottom line: use $R^2$ as one tool among several. \textbf{Residual plots} are at least as important---they reveal problems that a single number cannot.
+
+\subsection{Summary: A Checklist for Assessing Your Fit}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Plot the data and the fitted curve.} Does the curve follow the overall trend?
+  \item \textbf{Plot the residuals vs.\ $x$.} Do they look random? Any pattern is a red flag.
+  \item \textbf{Compute $R^2$.} Is it close to 1? But remember: high $R^2$ alone is not sufficient.
+  \item \textbf{Consider the science.} Does the model type make physical/logical sense? A power law for a process known to be exponential is wrong, even if $R^2$ is high.
+  \item \textbf{Test on new data.} If possible, check predictions against data not used in the fit. This is the ultimate test.
+\end{enumerate}
+
+\begin{takeaway}
+Assessing a fit requires more than one number. The $R^2$ statistic summarizes overall fit quality (proportion of variance explained), but \textbf{residual analysis} reveals problems that $R^2$ cannot detect. Always plot the residuals. And remember: the best model is the \textbf{simplest} one that adequately describes the data.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 5 Summary}
+\addcontentsline{toc}{section}{Unit 5 Summary}
+
+This unit introduced curve fitting as the complement of interpolation---the right approach when data is noisy.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{The curve fitting problem:} With noisy data, we choose a simple model (fewer parameters than data points) and find the ``best'' parameters. This avoids overfitting to noise.
+
+  \item \textbf{Least squares:} The standard criterion minimizes $S = \sum(y_i - p(x_i))^2$. Squaring is chosen for differentiability, and the solution has a geometric interpretation as an orthogonal projection.
+
+  \item \textbf{Linear least squares:} Fitting a line (or any linear combination of known functions) leads to the \textbf{normal equations} $A^T A \, \mathbf{a} = A^T \mathbf{y}$---a square, symmetric, positive-definite system.
+
+  \item \textbf{Polynomial least squares:} Extends the line fit to parabolas and higher-degree curves. The key challenge is choosing the degree---high enough to capture the trend, low enough to avoid overfitting.
+
+  \item \textbf{Linearizable models:} Exponential ($y = ae^{bx}$), power-law ($y = ax^b$), and logarithmic models can be linearized by taking logarithms, then solved with standard linear least squares.
+
+  \item \textbf{Goodness of fit:} The coefficient of determination $R^2$ quantifies how much variation the model explains. But always supplement $R^2$ with residual plots---they reveal systematic problems that a single number cannot.
+\end{enumerate}
+
+\medskip
+Key theme: the \textbf{simplicity--accuracy trade-off}. Least squares finds the best fit within a chosen model class; the harder question is choosing the right model. Start simple, examine the residuals, and increase complexity only when justified.
+
+\end{document}

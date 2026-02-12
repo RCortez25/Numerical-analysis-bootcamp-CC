@@ -1,0 +1,634 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 6: Numerical Differentiation}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 6 \\[0.3cm]}
+{\LARGE Numerical Differentiation \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+How do we compute derivatives when all we have is\\
+a table of values or a black-box function?\\
+Finite differences, accuracy, and the treacherous role of step size.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 6.1
+% ============================================================
+\section{Why Approximate Derivatives?}
+
+\subsection{When Exact Derivatives Are Not Available}
+
+In calculus, we learn rules for differentiating functions symbolically: the power rule, the chain rule, the product rule. Given a formula like $f(x) = x^3 \sin(x)$, we can compute $f'(x)$ exactly. So why would we ever need to \emph{approximate} a derivative?
+
+There are several common situations where symbolic differentiation is not an option:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{The function is given only as data.} A sensor records temperature every minute. You want the rate of temperature change---the derivative---but you have no formula, only a table of numbers.
+
+  \item \textbf{The function is a ``black box.''} In many engineering applications, $f(x)$ is the output of a complex simulation (e.g., a finite element solver). You can evaluate $f$ at any point, but you cannot differentiate it symbolically.
+
+  \item \textbf{The formula is too complicated.} Some functions involve deeply nested compositions, special functions, or implicit definitions. Symbolic differentiation may be possible in principle but impractical.
+
+  \item \textbf{Building blocks for other methods.} Numerical differentiation is a key ingredient in solving differential equations (Units 8--10). Finite difference approximations to derivatives are the foundation of finite difference methods for ODEs and PDEs.
+\end{itemize}
+
+\subsection{The Connection to Earlier Units}
+
+We have already seen numerical differentiation in disguise:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Newton's method} (Unit 2) uses $f'(x)$ at each step. If $f'$ is unavailable, the secant method approximates it with a finite difference---exactly the topic of this unit.
+  \item \textbf{Truncation error} (Unit 1) was illustrated using the forward difference formula. Now we study that formula and its relatives systematically.
+  \item \textbf{Interpolation} (Unit 4) provides another route: interpolate the data with a polynomial, then differentiate the polynomial. Finite differences can be derived this way.
+\end{itemize}
+
+\subsection{What Lies Ahead}
+
+This unit develops the main \textbf{finite difference formulas} for approximating first and second derivatives, analyzes their accuracy, and introduces \textbf{Richardson extrapolation} as a technique for squeezing more accuracy out of basic formulas. We also discuss the subtle interplay between truncation error and round-off error that makes numerical differentiation a surprisingly delicate operation.
+
+\begin{takeaway}
+Numerical differentiation is needed whenever we must compute derivatives from data, from black-box functions, or as building blocks for differential equation solvers. The main tool is the \textbf{finite difference approximation}, which replaces the limit in the derivative definition with a small but finite step.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 6.2
+% ============================================================
+\section{Finite Difference Formulas}
+
+All finite difference formulas are derived from the same source: the \textbf{Taylor series expansion}. We keep the derivations simple and focus on building intuition.
+
+\subsection{The Starting Point: Taylor Series}
+
+Recall that if $f$ is sufficiently smooth, the Taylor expansion of $f(x+h)$ around $x$ is:
+\[
+f(x+h) = f(x) + h\,f'(x) + \frac{h^2}{2}\,f''(x) + \frac{h^3}{6}\,f'''(x) + \cdots
+\]
+
+Similarly, expanding in the other direction:
+\[
+f(x-h) = f(x) - h\,f'(x) + \frac{h^2}{2}\,f''(x) - \frac{h^3}{6}\,f'''(x) + \cdots
+\]
+
+By manipulating these expansions, we can isolate $f'(x)$ and obtain various approximation formulas.
+
+\subsection{Forward Difference}
+
+Solve the first Taylor expansion for $f'(x)$:
+\[
+f'(x) = \frac{f(x+h) - f(x)}{h} - \frac{h}{2}\,f''(x) - \cdots
+\]
+
+Dropping the higher-order terms:
+
+\begin{keyconcept}[title={Forward Difference Formula}]
+\[
+f'(x) \approx \frac{f(x+h) - f(x)}{h}.
+\]
+\textbf{Error:} $O(h)$ --- first-order accurate.
+\end{keyconcept}
+
+This is the most intuitive formula: it is literally the slope of the secant line from $(x, f(x))$ to $(x+h, f(x+h))$. As $h \to 0$, the secant becomes the tangent and we recover the exact derivative.
+
+\subsection{Backward Difference}
+
+Using the expansion of $f(x-h)$ instead:
+
+\begin{keyconcept}[title={Backward Difference Formula}]
+\[
+f'(x) \approx \frac{f(x) - f(x-h)}{h}.
+\]
+\textbf{Error:} $O(h)$ --- first-order accurate.
+\end{keyconcept}
+
+The backward difference uses the point \emph{behind} $x$ instead of ahead. It has the same order of accuracy as the forward difference. Its main use is at the \textbf{right boundary} of an interval, where $f(x+h)$ may not be available.
+
+\subsection{Central Difference}
+
+Now the clever move: \textbf{subtract} the two Taylor expansions:
+\begin{align*}
+f(x+h) - f(x-h) &= \left[f(x) + hf'(x) + \tfrac{h^2}{2}f''(x) + \tfrac{h^3}{6}f'''(x) + \cdots\right] \\
+&\quad - \left[f(x) - hf'(x) + \tfrac{h^2}{2}f''(x) - \tfrac{h^3}{6}f'''(x) + \cdots\right] \\
+&= 2h\,f'(x) + \tfrac{h^3}{3}f'''(x) + \cdots
+\end{align*}
+
+Solving for $f'(x)$:
+
+\begin{keyconcept}[title={Central Difference Formula}]
+\[
+f'(x) \approx \frac{f(x+h) - f(x-h)}{2h}.
+\]
+\textbf{Error:} $O(h^2)$ --- second-order accurate!
+\end{keyconcept}
+
+The central difference is \textbf{one order more accurate} than the forward or backward difference, for essentially the same computational cost (two function evaluations). The $h^2$ error term was cancelled by the subtraction---the even-powered terms in the Taylor series vanish.
+
+\begin{example}[title={Comparing the Three Formulas}]
+Estimate $f'(1)$ for $f(x) = e^x$ using $h = 0.1$. The exact answer is $f'(1) = e \approx 2.718282$.
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} llll @{}}
+\toprule
+\textbf{Formula} & \textbf{Computation} & \textbf{Result} & \textbf{Error} \\
+\midrule
+Forward & $\dfrac{e^{1.1} - e^{1}}{0.1}$ & $2.858842$ & $0.1406$ \\[8pt]
+Backward & $\dfrac{e^{1} - e^{0.9}}{0.1}$ & $2.582340$ & $0.1359$ \\[8pt]
+Central & $\dfrac{e^{1.1} - e^{0.9}}{0.2}$ & $2.720591$ & $0.00231$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The central difference is about \textbf{60 times more accurate} than the forward or backward difference with the same $h$. This is the power of second-order accuracy.
+\end{example}
+
+\subsection{Summary of First-Derivative Formulas}
+
+\begin{center}
+\begin{tabular}{@{} llcc @{}}
+\toprule
+\textbf{Name} & \textbf{Formula} & \textbf{Order} & \textbf{Evaluations} \\
+\midrule
+Forward difference & $\dfrac{f(x+h)-f(x)}{h}$ & $O(h)$ & 2 \\[8pt]
+Backward difference & $\dfrac{f(x)-f(x-h)}{h}$ & $O(h)$ & 2 \\[8pt]
+Central difference & $\dfrac{f(x+h)-f(x-h)}{2h}$ & $O(h^2)$ & 2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+The three basic finite difference formulas approximate $f'(x)$ using nearby function values. The central difference is the clear winner: it achieves $O(h^2)$ accuracy with the same number of function evaluations as the $O(h)$ forward and backward formulas. Use central differences whenever possible.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 6.3
+% ============================================================
+\section{Accuracy and Step Size}
+
+\subsection{Truncation Error: Smaller $h$ Is Better\ldots}
+
+From the error formulas:
+\begin{itemize}[leftmargin=2em]
+  \item Forward/backward difference: error $\approx \dfrac{h}{2}|f''(\xi)|$.
+  \item Central difference: error $\approx \dfrac{h^2}{6}|f'''(\xi)|$.
+\end{itemize}
+
+Decreasing $h$ decreases the truncation error. Halving $h$ halves the error for forward/backward differences and cuts it by a factor of 4 for the central difference.
+
+\subsection{\ldots But Round-Off Error Gets Worse}
+
+Here is the twist that makes numerical differentiation tricky. Consider the forward difference:
+\[
+\frac{f(x+h) - f(x)}{h}.
+\]
+
+When $h$ is very small, $f(x+h)$ and $f(x)$ are nearly equal. Their difference is affected by \textbf{catastrophic cancellation} (Unit 1, Section 1.4). If both values are stored with a round-off error of order $\varepsilon_{\mathrm{mach}} \cdot |f(x)|$, then:
+\[
+\text{round-off error in the difference} \approx \frac{2\varepsilon_{\mathrm{mach}}\,|f(x)|}{h}.
+\]
+
+As $h \to 0$, this \textbf{grows without bound}! The smaller $h$ gets, the worse the round-off contamination.
+
+\subsection{The Optimal Step Size}
+
+The total error is the sum of truncation and round-off errors. For the \textbf{forward difference}:
+\[
+\text{total error} \approx \underbrace{\frac{h}{2}|f''|}_{\text{truncation}} + \underbrace{\frac{\varepsilon_{\mathrm{mach}}\,|f|}{h}}_{\text{round-off}}.
+\]
+
+These two terms pull in opposite directions:
+\begin{itemize}[leftmargin=2em]
+  \item Truncation error decreases as $h \to 0$.
+  \item Round-off error increases as $h \to 0$.
+\end{itemize}
+
+The optimal $h$ balances the two. Setting the derivative of the total error (with respect to $h$) to zero:
+
+\begin{keyconcept}[title={Optimal Step Size}]
+For the \textbf{forward difference}:
+\[
+h_{\mathrm{opt}} \approx \sqrt{\varepsilon_{\mathrm{mach}}} \approx 10^{-8} \quad \text{(double precision)}.
+\]
+The minimum total error is approximately $\sqrt{\varepsilon_{\mathrm{mach}}} \approx 10^{-8}$---about \textbf{8 correct digits}.
+
+\medskip
+For the \textbf{central difference}:
+\[
+h_{\mathrm{opt}} \approx \varepsilon_{\mathrm{mach}}^{1/3} \approx 10^{-5} \quad \text{(double precision)}.
+\]
+The minimum total error is approximately $\varepsilon_{\mathrm{mach}}^{2/3} \approx 10^{-11}$---about \textbf{11 correct digits}.
+\end{keyconcept}
+
+\begin{example}[title={The Step-Size Sweet Spot}]
+Estimate $f'(1)$ for $f(x) = e^x$ using the central difference with various $h$:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} cll @{}}
+\toprule
+$h$ & Central difference result & Error \\
+\midrule
+$10^{-1}$ & $2.72059$ & $2.3 \times 10^{-3}$ \\
+$10^{-2}$ & $2.71831$ & $2.3 \times 10^{-5}$ \\
+$10^{-4}$ & $2.71828183$ & $2.3 \times 10^{-9}$ \\
+$10^{-5}$ & $2.718281828\mathbf{5}$ & $\approx 10^{-11}$ \\
+$10^{-8}$ & $2.71828183$ & $\approx 10^{-8}$ \\
+$10^{-12}$ & $2.7183$ & $\approx 10^{-4}$ \\
+$10^{-15}$ & $0.0$ or garbage & total loss \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The error \textbf{decreases} as $h$ shrinks from $10^{-1}$ to $10^{-5}$, reaches its minimum around $h \approx 10^{-5}$, then \textbf{increases} for smaller $h$ as round-off takes over. At $h = 10^{-15}$, the result is meaningless.
+\end{example}
+
+\begin{warning}
+The existence of an \textbf{optimal step size} is a fundamental feature of numerical differentiation. Making $h$ ``as small as possible'' is \textbf{not} the right strategy---it leads to catastrophic round-off. In practice, use $h \sim 10^{-8}$ for forward/backward differences and $h \sim 10^{-5}$ for central differences (in double precision).
+\end{warning}
+
+\begin{takeaway}
+Numerical differentiation faces a fundamental tension: truncation error wants $h$ small, but round-off error wants $h$ large. The optimal step size balances these competing effects. For the central difference in double precision, the sweet spot is around $h \approx 10^{-5}$, giving about 11 digits of accuracy---far fewer than the 16 digits available.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 6.4
+% ============================================================
+\section{Higher-Order Derivatives}
+
+\subsection{Second Derivative Approximation}
+
+The second derivative $f''(x)$ can also be approximated using finite differences. The most common formula comes from \textbf{adding} (rather than subtracting) the Taylor expansions of $f(x+h)$ and $f(x-h)$:
+\begin{align*}
+f(x+h) + f(x-h) &= 2f(x) + h^2 f''(x) + \frac{h^4}{12}f^{(4)}(x) + \cdots
+\end{align*}
+
+Solving for $f''(x)$:
+
+\begin{keyconcept}[title={Central Difference for the Second Derivative}]
+\[
+f''(x) \approx \frac{f(x+h) - 2f(x) + f(x-h)}{h^2}.
+\]
+\textbf{Error:} $O(h^2)$ --- second-order accurate.
+\end{keyconcept}
+
+This formula is sometimes called the \textbf{three-point stencil} for the second derivative. It uses three function values: $f(x-h)$, $f(x)$, and $f(x+h)$.
+
+\begin{example}[title={Second Derivative Approximation}]
+Estimate $f''(1)$ for $f(x) = e^x$ using $h = 0.01$. The exact answer is $f''(1) = e \approx 2.718282$.
+
+\[
+\frac{e^{1.01} - 2e^{1} + e^{0.99}}{(0.01)^2} = \frac{2.745601 - 5.436564 + 2.691234}{0.0001} = \frac{0.000271}{0.0001} \approx 2.71828.
+\]
+
+Excellent---5 correct digits with $h = 0.01$.
+\end{example}
+
+\begin{warning}
+The second derivative formula divides by $h^2$, not $h$. This makes it \textbf{even more sensitive to round-off} than first-derivative formulas. The optimal step size is:
+\[
+h_{\mathrm{opt}} \approx \varepsilon_{\mathrm{mach}}^{1/4} \approx 10^{-4} \quad \text{(double precision)},
+\]
+giving roughly $8$ correct digits---less than the $11$ achievable for the first derivative with the central difference.
+\end{warning}
+
+\subsection{Finite Difference Stencils}
+
+The term \textbf{stencil} refers to the pattern of points used in a finite difference formula. We have already seen:
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+\textbf{Stencil name} & \textbf{Points used} & \textbf{Approximates} \\
+\midrule
+Forward 2-point & $x, \; x+h$ & $f'(x)$, $O(h)$ \\
+Backward 2-point & $x-h, \; x$ & $f'(x)$, $O(h)$ \\
+Central 2-point & $x-h, \; x+h$ & $f'(x)$, $O(h^2)$ \\
+Central 3-point & $x-h, \; x, \; x+h$ & $f''(x)$, $O(h^2)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+By using more points, we can derive \textbf{higher-order stencils} that are more accurate. For example, the \textbf{five-point stencil} for $f'(x)$:
+\[
+f'(x) \approx \frac{-f(x+2h) + 8f(x+h) - 8f(x-h) + f(x-2h)}{12h},
+\]
+which is $O(h^4)$---fourth-order accurate. These higher-order stencils use more function evaluations per estimate but achieve greater accuracy for a given $h$.
+
+\begin{keyconcept}
+The general principle: \textbf{more points in the stencil $=$ higher order of accuracy}. This is analogous to higher-degree polynomial interpolation giving a better local approximation. The trade-off is more function evaluations per derivative estimate.
+\end{keyconcept}
+
+\begin{takeaway}
+The second derivative is approximated by the three-point central difference $\frac{f(x+h) - 2f(x) + f(x-h)}{h^2}$, which is $O(h^2)$ accurate. Higher-order stencils using more points can achieve better accuracy. All formulas face the truncation-vs-round-off trade-off, and second derivatives are more sensitive to round-off because of the $h^2$ denominator.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 6.5
+% ============================================================
+\section{Richardson Extrapolation}
+
+What if we could take a cheap, low-order approximation and magically improve its accuracy? That is exactly what \textbf{Richardson extrapolation} does.
+
+\subsection{The Core Idea}
+
+Suppose we have an approximation $D(h)$ to some exact value $D^*$, and we know the error has a specific form:
+\[
+D(h) = D^* + c_1 h^p + c_2 h^{p+1} + \cdots
+\]
+where $c_1, c_2, \ldots$ are unknown constants and $p$ is the known order of accuracy.
+
+Now compute $D(h)$ with two different step sizes---say $h$ and $h/2$:
+\begin{align*}
+D(h) &= D^* + c_1 h^p + O(h^{p+1}), \\
+D(h/2) &= D^* + c_1 (h/2)^p + O(h^{p+1}) = D^* + \frac{c_1 h^p}{2^p} + O(h^{p+1}).
+\end{align*}
+
+We can \textbf{eliminate the leading error term} $c_1 h^p$ by taking the right linear combination:
+
+\begin{keyconcept}[title={Richardson Extrapolation}]
+If $D(h)$ is a $p$-th order approximation to $D^*$, then:
+\[
+D_{\mathrm{improved}} = \frac{2^p \, D(h/2) - D(h)}{2^p - 1}
+\]
+is an approximation of order $p+1$ (or higher). The leading error term has been cancelled.
+\end{keyconcept}
+
+\subsection{Applying Richardson to the Central Difference}
+
+The central difference for $f'(x)$ has error $O(h^2)$, so $p = 2$:
+\begin{align*}
+D(h) &= \frac{f(x+h) - f(x-h)}{2h}, \\[6pt]
+D(h/2) &= \frac{f(x+h/2) - f(x-h/2)}{h}.
+\end{align*}
+
+Richardson extrapolation with $p = 2$:
+\[
+D_{\mathrm{improved}} = \frac{4\,D(h/2) - D(h)}{3}.
+\]
+
+This combination is $O(h^4)$---two orders better!
+
+\begin{example}[title={Richardson Extrapolation in Action}]
+Estimate $f'(1)$ for $f(x) = e^x$ using the central difference with $h = 0.1$ and $h = 0.05$.
+
+\textbf{Step 1:} Compute the two approximations.
+\begin{align*}
+D(0.1) &= \frac{e^{1.1} - e^{0.9}}{0.2} = 2.720541, \\
+D(0.05) &= \frac{e^{1.05} - e^{0.95}}{0.1} = 2.718846.
+\end{align*}
+
+\textbf{Step 2:} Apply Richardson ($p = 2$):
+\[
+D_{\mathrm{improved}} = \frac{4(2.718846) - 2.720541}{3} = \frac{10.875384 - 2.720541}{3} = \frac{8.154843}{3} = 2.718281.
+\]
+
+Exact value: $e = 2.718282\ldots$
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+\textbf{Method} & \textbf{Result} & \textbf{Error} \\
+\midrule
+Central, $h=0.1$ & $2.720541$ & $2.3 \times 10^{-3}$ \\
+Central, $h=0.05$ & $2.718846$ & $5.6 \times 10^{-4}$ \\
+Richardson extrapolated & $2.718281$ & $\mathbf{1 \times 10^{-6}}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Richardson extrapolation improved the accuracy by a factor of $\sim\!500$ without computing any new function values beyond what was already used!
+\end{example}
+
+\subsection{Why Richardson Extrapolation Is Powerful}
+
+\begin{itemize}[leftmargin=2em]
+  \item It is \textbf{general}: it works for any approximation whose error has a known power-series form---not just derivatives, but also integrals (Unit 7: Romberg integration), ODE solutions, and more.
+  \item It is \textbf{cheap}: it combines existing computations; no new function evaluations are needed beyond those already computed for $D(h)$ and $D(h/2)$.
+  \item It can be \textbf{applied repeatedly}: the improved estimate $D_{\mathrm{improved}}$ itself has an error of some order, so we can apply Richardson again with finer step sizes to get even higher accuracy.
+\end{itemize}
+
+\begin{takeaway}
+Richardson extrapolation is a powerful, general technique: combine two approximations at different step sizes to cancel the leading error term and jump to a higher order of accuracy. For the central difference, it turns an $O(h^2)$ formula into an $O(h^4)$ result. We will see it again in Unit 7 as the engine behind Romberg integration.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 6.6
+% ============================================================
+\section{Pitfalls and Practical Tips}
+
+Numerical differentiation is conceptually straightforward but practically treacherous. This section collects the main dangers and practical guidance.
+
+\subsection{Sensitivity to Noise}
+
+When data contains noise---random measurement errors---numerical differentiation \textbf{amplifies} that noise dramatically.
+
+\begin{keyconcept}
+Differentiation is a \textbf{noise amplifier}. If data has random errors of size $\varepsilon$, a finite difference with step size $h$ produces derivative estimates with noise of order $\varepsilon / h$. The smaller $h$ is, the worse the amplification.
+\end{keyconcept}
+
+\begin{example}[title={Differentiating Noisy Data}]
+Suppose we have $f(x) = \sin(x)$ measured with noise of amplitude $10^{-4}$:
+\begin{align*}
+\tilde{f}(x) &= \sin(x) + \text{noise}, \quad |\text{noise}| \leq 10^{-4}.
+\end{align*}
+
+Using the central difference with $h = 0.001$:
+\[
+\text{noise in derivative} \approx \frac{10^{-4}}{0.001} = 0.1.
+\]
+
+The noise has been amplified by a factor of $1/h = 1000$! The derivative of $\sin(x)$ is $\cos(x)$, which has values between $-1$ and $1$, so an error of $0.1$ is a $10\%$ relative error---much worse than the original $0.01\%$ noise in the data.
+\end{example}
+
+This is why, for noisy data, direct finite differencing is often a bad idea. Better alternatives include:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Smooth the data first} (e.g., with a least-squares fit from Unit 5), then differentiate the smooth model.
+  \item \textbf{Use a larger $h$} to average out the noise (at the cost of more truncation error).
+  \item Use specialized techniques like \textbf{regularized differentiation} (beyond this bootcamp's scope).
+\end{itemize}
+
+\subsection{Choosing Step Size in Practice}
+
+For a smooth, noise-free function evaluated in double precision:
+
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+\textbf{Formula} & \textbf{Optimal $h$} & \textbf{Best achievable accuracy} \\
+\midrule
+Forward/backward difference ($f'$) & $\sqrt{\varepsilon_{\mathrm{mach}}} \approx 10^{-8}$ & $\sim 8$ digits \\
+Central difference ($f'$) & $\varepsilon_{\mathrm{mach}}^{1/3} \approx 10^{-5}$ & $\sim 11$ digits \\
+Central difference ($f''$) & $\varepsilon_{\mathrm{mach}}^{1/4} \approx 10^{-4}$ & $\sim 8$ digits \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{When data is noisy} with error level $\varepsilon_{\mathrm{data}}$, replace $\varepsilon_{\mathrm{mach}}$ with $\varepsilon_{\mathrm{data}}$ in the formulas above. Since $\varepsilon_{\mathrm{data}} \gg \varepsilon_{\mathrm{mach}}$ typically, the optimal $h$ is much larger and the best achievable accuracy is much lower.
+
+\subsection{Differentiation Is Inherently Ill-Conditioned}
+
+We can now state a deep truth about numerical differentiation:
+
+\begin{warning}[title={Differentiation vs.\ Integration}]
+\textbf{Differentiation is inherently ill-conditioned:} small perturbations in $f$ can cause large changes in $f'$. A smooth function plus tiny noise is still smooth, but its derivative can be wildly oscillatory.
+
+\textbf{Integration is inherently well-conditioned:} small perturbations in $f$ cause only small changes in $\int f\,dx$. Integration averages out noise; differentiation amplifies it.
+
+This is why numerical integration (Unit 7) is generally easier and more accurate than numerical differentiation.
+\end{warning}
+
+\subsection{Practical Checklist}
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Use central differences} whenever possible ($O(h^2)$ vs.\ $O(h)$).
+  \item \textbf{Don't make $h$ too small.} The optimal $h$ is much larger than you might expect.
+  \item \textbf{Use Richardson extrapolation} to improve accuracy without shrinking $h$ further.
+  \item \textbf{Be cautious with noisy data.} Smooth first, then differentiate.
+  \item \textbf{Verify by comparing} results at two or three different step sizes. If the results agree, you likely have a good estimate.
+  \item \textbf{Prefer integration over differentiation} when the problem can be reformulated (e.g., integration by parts).
+\end{enumerate}
+
+\begin{takeaway}
+Numerical differentiation is powerful but fragile. The key dangers are round-off error (from too-small $h$) and noise amplification. Always use central differences, choose $h$ wisely, and apply Richardson extrapolation for extra accuracy. Remember: differentiation amplifies errors, while integration smooths them---a fundamental asymmetry we exploit in Unit 7.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 6 Summary}
+\addcontentsline{toc}{section}{Unit 6 Summary}
+
+This unit developed the tools for approximating derivatives numerically.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Finite difference formulas} approximate $f'(x)$ by evaluating $f$ at nearby points. The three basic formulas---forward, backward, and central---are derived from Taylor series. The \textbf{central difference} is the best: $O(h^2)$ accuracy for the same cost.
+
+  \item \textbf{Step size selection} involves a fundamental trade-off between truncation error ($h$ too large) and round-off error ($h$ too small). The optimal $h$ is $\sim 10^{-5}$ for the central first derivative and $\sim 10^{-4}$ for the second derivative, in double precision.
+
+  \item \textbf{Higher-order derivatives} use wider stencils. The second derivative formula $\frac{f(x+h)-2f(x)+f(x-h)}{h^2}$ is $O(h^2)$ but more sensitive to round-off (divides by $h^2$). Higher-order stencils achieve better accuracy at the cost of more function evaluations.
+
+  \item \textbf{Richardson extrapolation} combines two estimates at different step sizes to cancel the leading error term, boosting accuracy by one or more orders. It is general, cheap, and reusable.
+
+  \item \textbf{Numerical differentiation is ill-conditioned:} noise in the data is amplified by a factor of $1/h$. For noisy data, smooth first, then differentiate. Contrast with integration, which is well-conditioned.
+\end{enumerate}
+
+\medskip
+Key connection to what follows: the finite difference formulas developed here---especially the central differences for $f'$ and $f''$---are the \textbf{building blocks} for solving differential equations numerically (Units 8--10).
+
+\end{document}

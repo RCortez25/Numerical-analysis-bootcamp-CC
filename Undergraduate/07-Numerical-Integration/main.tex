@@ -1,0 +1,642 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 7: Numerical Integration}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 7 \\[0.3cm]}
+{\LARGE Numerical Integration (Quadrature) \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+How do we compute $\displaystyle\int_a^b f(x)\,dx$ when there is no\\
+closed-form antiderivative? Trapezoids, parabolas,\\
+and the art of choosing evaluation points.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 7.1
+% ============================================================
+\section{Why Numerical Integration?}
+
+\subsection{The Problem}
+
+Computing a definite integral
+\[
+I = \int_a^b f(x)\,dx
+\]
+is one of the most common tasks in science and engineering. In calculus, we learn the Fundamental Theorem: find an antiderivative $F(x)$, then $I = F(b) - F(a)$. Simple---when it works.
+
+But for the vast majority of integrals encountered in practice, it does not work:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{No closed-form antiderivative exists.} Classic examples include $\int e^{-x^2}\,dx$, $\int \frac{\sin x}{x}\,dx$, and $\int \sqrt{1 + x^3}\,dx$. These functions have no expression in terms of elementary functions.
+
+  \item \textbf{The integrand is given only as data.} A sensor records velocity every second. The integral of velocity gives displacement---but we have a table of numbers, not a formula.
+
+  \item \textbf{The integrand is a black-box function.} The output of a complex simulation can be evaluated at any point, but there is no symbolic formula to integrate.
+
+  \item \textbf{The integral is multi-dimensional.} Even when one-dimensional antiderivatives exist, multi-dimensional integrals often have none.
+\end{itemize}
+
+\subsection{The Basic Strategy}
+
+All numerical integration methods share the same fundamental idea:
+
+\begin{keyconcept}
+Approximate the integral as a \textbf{weighted sum} of function values:
+\[
+\int_a^b f(x)\,dx \approx \sum_{i=0}^{n} w_i \, f(x_i),
+\]
+where $x_0, x_1, \ldots, x_n$ are chosen \textbf{nodes} (evaluation points) and $w_0, w_1, \ldots, w_n$ are corresponding \textbf{weights}.
+\end{keyconcept}
+
+Different methods differ in their choice of nodes and weights. The goal: choose them so that the approximation is as accurate as possible with as few function evaluations as possible.
+
+\subsection{A Happy Contrast with Differentiation}
+
+Recall from Unit 6 that numerical differentiation is inherently ill-conditioned: small errors in $f$ get amplified. Numerical integration enjoys the opposite property:
+
+\begin{keyconcept}
+Integration is \textbf{well-conditioned}. Small errors in $f$ produce only small errors in the integral. Integration \textbf{smooths out} noise rather than amplifying it. This makes numerical integration significantly easier and more reliable than numerical differentiation.
+\end{keyconcept}
+
+\begin{takeaway}
+Numerical integration (also called \textbf{quadrature}) approximates $\int_a^b f(x)\,dx$ as a weighted sum of function values. It is needed whenever exact antiderivatives are unavailable, the integrand is data or a black box, or the integral is multi-dimensional. Unlike differentiation, integration is well-conditioned---a welcome relief.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 7.2
+% ============================================================
+\section{The Trapezoidal Rule}
+
+The trapezoidal rule is the simplest useful quadrature method. Its geometric picture is immediately clear.
+
+\subsection{Geometric Idea}
+
+To approximate $\int_a^b f(x)\,dx$, connect the endpoints $(a, f(a))$ and $(b, f(b))$ with a straight line and compute the area of the resulting \textbf{trapezoid}.
+
+The area of a trapezoid with parallel sides $f(a)$ and $f(b)$ and width $(b-a)$ is:
+
+\begin{keyconcept}[title={Simple Trapezoidal Rule}]
+\[
+\int_a^b f(x)\,dx \approx \frac{b-a}{2}\big[f(a) + f(b)\big].
+\]
+This approximates the curve by a straight line between the two endpoints.
+\end{keyconcept}
+
+For a single interval, this is quite crude. The power comes from subdividing.
+
+\subsection{The Composite Trapezoidal Rule}
+
+Divide $[a, b]$ into $n$ equal subintervals of width $h = (b-a)/n$, with nodes:
+\[
+x_i = a + ih, \quad i = 0, 1, \ldots, n.
+\]
+
+Apply the simple trapezoidal rule on each subinterval and add up:
+
+\begin{keyconcept}[title={Composite Trapezoidal Rule}]
+\[
+\int_a^b f(x)\,dx \approx T_n = \frac{h}{2}\Big[f(x_0) + 2f(x_1) + 2f(x_2) + \cdots + 2f(x_{n-1}) + f(x_n)\Big].
+\]
+Equivalently:
+\[
+T_n = h\left[\frac{f(a)}{2} + \sum_{i=1}^{n-1} f(x_i) + \frac{f(b)}{2}\right].
+\]
+This requires $n+1$ function evaluations.
+\end{keyconcept}
+
+Notice the pattern: the first and last values get weight $\frac{1}{2}$, all interior values get weight $1$. This comes from each interior point being shared by two adjacent trapezoids.
+
+\begin{example}[title={Composite Trapezoidal Rule}]
+Estimate $\displaystyle\int_0^1 e^{-x^2}\,dx$ using $n = 4$ subintervals.
+
+$h = (1-0)/4 = 0.25$. The nodes and function values:
+
+\medskip
+\begin{center}
+\begin{tabular}{c|ccccc}
+$x_i$ & 0 & 0.25 & 0.50 & 0.75 & 1.00 \\
+\hline
+$e^{-x_i^2}$ & 1.00000 & 0.93941 & 0.77880 & 0.56978 & 0.36788
+\end{tabular}
+\end{center}
+\medskip
+
+\begin{align*}
+T_4 &= \frac{0.25}{2}\big[1.00000 + 2(0.93941) + 2(0.77880) + 2(0.56978) + 0.36788\big] \\
+    &= 0.125 \times [1.00000 + 1.87882 + 1.55760 + 1.13956 + 0.36788] \\
+    &= 0.125 \times 5.94386 = 0.74298.
+\end{align*}
+
+The exact value (to 5 decimal places) is $0.74682$. Our estimate has an error of about $0.004$---not bad for only 5 function evaluations.
+\end{example}
+
+\subsection{Error Analysis}
+
+The error of the composite trapezoidal rule is:
+
+\begin{keyconcept}[title={Trapezoidal Rule Error}]
+\[
+\left|\int_a^b f(x)\,dx - T_n\right| \leq \frac{(b-a)^3}{12n^2}\,\max_{x \in [a,b]}|f''(x)| = \frac{(b-a)\,h^2}{12}\,\max|f''|.
+\]
+The error is $O(h^2)$: \textbf{second-order accurate}.
+\end{keyconcept}
+
+This means:
+\begin{itemize}[leftmargin=2em]
+  \item Doubling $n$ (halving $h$) reduces the error by a factor of $\mathbf{4}$.
+  \item The method is exact for linear functions ($f'' = 0$).
+\end{itemize}
+
+\begin{takeaway}
+The trapezoidal rule approximates the integrand by straight-line segments between adjacent nodes. The composite version subdivides the interval and is $O(h^2)$ accurate. It is simple, reliable, and serves as the foundation for more advanced methods.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 7.3
+% ============================================================
+\section{Simpson's Rule}
+
+Simpson's rule is the next step up: instead of approximating $f$ by straight lines, we use \textbf{parabolas}. This simple upgrade yields a dramatic improvement in accuracy.
+
+\subsection{Geometric Idea}
+
+Take three consecutive nodes $x_0, x_1, x_2$ (with $x_1$ at the midpoint). Fit a parabola (degree-2 polynomial) through the three points $(x_i, f(x_i))$. Integrate the parabola exactly.
+
+For a single pair of subintervals (three points spaced $h$ apart):
+
+\begin{keyconcept}[title={Simple Simpson's Rule}]
+\[
+\int_{x_0}^{x_2} f(x)\,dx \approx \frac{h}{3}\big[f(x_0) + 4f(x_1) + f(x_2)\big],
+\]
+where $h = x_1 - x_0 = x_2 - x_1$.
+\end{keyconcept}
+
+The weights $1, 4, 1$ (scaled by $h/3$) come from integrating the Lagrange interpolating polynomial through the three points.
+
+\subsection{The Composite Simpson's Rule}
+
+Divide $[a,b]$ into $n$ subintervals where $n$ is \textbf{even} (so that we can form pairs). With $h = (b-a)/n$:
+
+\begin{keyconcept}[title={Composite Simpson's Rule}]
+\[
+S_n = \frac{h}{3}\Big[f(x_0) + 4f(x_1) + 2f(x_2) + 4f(x_3) + 2f(x_4) + \cdots + 4f(x_{n-1}) + f(x_n)\Big].
+\]
+The pattern of weights is: $1, 4, 2, 4, 2, \ldots, 4, 2, 4, 1$, all multiplied by $h/3$.
+
+Requires $n+1$ function evaluations ($n$ must be even).
+\end{keyconcept}
+
+\begin{example}[title={Composite Simpson's Rule}]
+Estimate $\displaystyle\int_0^1 e^{-x^2}\,dx$ using $n = 4$ subintervals (same data as the trapezoidal example).
+
+\begin{align*}
+S_4 &= \frac{0.25}{3}\big[f(0) + 4f(0.25) + 2f(0.50) + 4f(0.75) + f(1.00)\big] \\
+    &= \frac{0.25}{3}\big[1.00000 + 4(0.93941) + 2(0.77880) + 4(0.56978) + 0.36788\big] \\
+    &= \frac{0.25}{3}\big[1.00000 + 3.75764 + 1.55760 + 2.27912 + 0.36788\big] \\
+    &= \frac{0.25}{3} \times 8.96224 = \frac{2.24056}{3} = 0.74685.
+\end{align*}
+
+The exact value is $0.74682$. Simpson's error: $\approx 0.00003$---about \textbf{100 times more accurate} than the trapezoidal rule with the same number of function evaluations!
+\end{example}
+
+\subsection{Error Analysis}
+
+\begin{keyconcept}[title={Simpson's Rule Error}]
+\[
+\left|\int_a^b f(x)\,dx - S_n\right| \leq \frac{(b-a)^5}{180\,n^4}\,\max_{x \in [a,b]}|f^{(4)}(x)| = \frac{(b-a)\,h^4}{180}\,\max|f^{(4)}|.
+\]
+The error is $O(h^4)$: \textbf{fourth-order accurate}.
+\end{keyconcept}
+
+This is a remarkable result. Although we fit \emph{parabolas} (degree 2), the method is exact for polynomials up to degree \textbf{3}---it is one order better than you would expect! This ``bonus'' accuracy comes from a lucky cancellation of the cubic error term due to the symmetry of the three-point rule.
+
+Practical implications:
+\begin{itemize}[leftmargin=2em]
+  \item Doubling $n$ (halving $h$) reduces the error by a factor of $\mathbf{16}$.
+  \item Simpson's rule is exact for polynomials of degree $\leq 3$.
+  \item For the same number of function evaluations, Simpson's is vastly superior to the trapezoidal rule.
+\end{itemize}
+
+\begin{warning}
+Simpson's rule requires an \textbf{even} number of subintervals $n$. If you have an odd number of data points (even number of intervals), you are fine. If you have an even number of data points (odd number of intervals), you need to handle the last interval separately (e.g., with the trapezoidal rule) or add one more point.
+\end{warning}
+
+\begin{takeaway}
+Simpson's rule approximates $f$ by parabolas over pairs of subintervals. It achieves $O(h^4)$ accuracy---two orders better than the trapezoidal rule---for the same number of function evaluations. It is the default quadrature rule for most routine integration tasks.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 7.4
+% ============================================================
+\section{Comparing Quadrature Rules}
+
+\subsection{Degree of Exactness}
+
+A useful way to characterize a quadrature rule is by its \textbf{degree of exactness}: the highest degree of polynomial for which the rule gives the exact integral.
+
+\begin{keyconcept}[title={Degree of Exactness}]
+A quadrature rule has \textbf{degree of exactness $d$} if it integrates every polynomial of degree $\leq d$ exactly, but fails for at least one polynomial of degree $d+1$.
+\end{keyconcept}
+
+\begin{center}
+\begin{tabular}{@{} lccc @{}}
+\toprule
+\textbf{Rule} & \textbf{Degree of exactness} & \textbf{Error order} & \textbf{Points per panel} \\
+\midrule
+Midpoint rule & 1 & $O(h^2)$ & 1 \\
+Trapezoidal rule & 1 & $O(h^2)$ & 2 \\
+Simpson's rule & 3 & $O(h^4)$ & 3 \\
+Simpson's 3/8 rule & 3 & $O(h^4)$ & 4 \\
+Boole's rule & 5 & $O(h^6)$ & 5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Notice a pattern: the trapezoidal rule uses degree-1 interpolation but gets degree-of-exactness 1. Simpson's rule uses degree-2 interpolation but gets degree-of-exactness 3 (one better than expected). This pattern continues: rules based on an \textbf{even} number of subintervals often gain a ``bonus'' order from symmetry.
+
+\subsection{Error Behavior as We Refine the Grid}
+
+The practical question: how fast does the error shrink as we increase $n$? This is the same ``order of accuracy'' concept from Unit 1.
+
+\begin{example}[title={Convergence Comparison}]
+Compute $\displaystyle\int_0^1 e^{-x^2}\,dx$ with increasing $n$:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} crr @{}}
+\toprule
+$n$ & Trapezoidal error & Simpson's error \\
+\midrule
+2 & $1.4 \times 10^{-2}$ & $5.0 \times 10^{-4}$ \\
+4 & $3.8 \times 10^{-3}$ & $3.3 \times 10^{-5}$ \\
+8 & $9.6 \times 10^{-4}$ & $2.1 \times 10^{-6}$ \\
+16 & $2.4 \times 10^{-4}$ & $1.3 \times 10^{-7}$ \\
+32 & $6.0 \times 10^{-5}$ & $8.3 \times 10^{-9}$ \\
+64 & $1.5 \times 10^{-5}$ & $5.2 \times 10^{-10}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Each doubling of $n$:
+\begin{itemize}
+  \item Trapezoidal: error shrinks by $\sim 4\times$ ($O(h^2)$ confirmed).
+  \item Simpson's: error shrinks by $\sim 16\times$ ($O(h^4)$ confirmed).
+\end{itemize}
+
+After $n = 64$ intervals (65 function evaluations), Simpson's achieves $\sim 10$ digits of accuracy while the trapezoidal rule has only $\sim 5$.
+\end{example}
+
+\subsection{The Midpoint Rule}
+
+As a useful bonus, we note the \textbf{midpoint rule}: instead of evaluating $f$ at the endpoints of each subinterval, evaluate it at the \textbf{midpoint}:
+
+\begin{keyconcept}[title={Composite Midpoint Rule}]
+\[
+M_n = h\sum_{i=0}^{n-1} f\!\left(\frac{x_i + x_{i+1}}{2}\right).
+\]
+Error: $O(h^2)$---the same order as the trapezoidal rule!
+\end{keyconcept}
+
+The midpoint rule is often slightly \textbf{more accurate} than the trapezoidal rule (by roughly a factor of 2 in the error constant), and it uses function values at the interior of each subinterval rather than at the endpoints. This can be advantageous when $f$ is not defined at the boundaries or when interior evaluations are preferred.
+
+\begin{takeaway}
+The trapezoidal and midpoint rules are both $O(h^2)$, while Simpson's rule is $O(h^4)$. Degree of exactness measures which polynomials a rule integrates perfectly. Higher-order rules converge much faster: Simpson's gains 4 digits of accuracy each time $n$ is doubled, versus 2 digits for the trapezoidal rule.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 7.5
+% ============================================================
+\section{Romberg Integration}
+
+Romberg integration is the natural combination of the composite trapezoidal rule with \textbf{Richardson extrapolation} (Unit 6, Section 6.5). It systematically produces high-accuracy results by building a table of successively improved estimates.
+
+\subsection{The Idea}
+
+Recall from Unit 6: if we have an approximation $D(h)$ with error $O(h^p)$, we can combine $D(h)$ and $D(h/2)$ to cancel the leading error term and get an $O(h^{p+2})$ approximation (or better).
+
+The composite trapezoidal rule $T_n$ has an error that can be expanded as:
+\[
+T_n = I + c_1 h^2 + c_2 h^4 + c_3 h^6 + \cdots
+\]
+where $I$ is the exact integral and $c_1, c_2, \ldots$ are constants (depending on $f$ and the interval, but not on $h$).
+
+The error involves only \textbf{even powers} of $h$. This is a special property of the trapezoidal rule (related to the Euler--Maclaurin formula) and it means Richardson extrapolation is particularly effective.
+
+\subsection{Building the Romberg Table}
+
+\begin{keyconcept}[title={Romberg Integration}]
+\begin{enumerate}
+  \item Compute trapezoidal estimates $T(h)$, $T(h/2)$, $T(h/4)$, $\ldots$ with successively halved step sizes.
+  \item Apply Richardson extrapolation to cancel the $h^2$ term: this produces Simpson-level ($O(h^4)$) estimates.
+  \item Apply Richardson again to cancel the $h^4$ term: this produces $O(h^6)$ estimates.
+  \item Continue until the desired accuracy is reached.
+\end{enumerate}
+
+The extrapolation formula at each level uses $p = 2k$ for the $k$-th column:
+\[
+R_{i,j} = \frac{4^j \, R_{i,j-1} - R_{i-1,j-1}}{4^j - 1}.
+\]
+\end{keyconcept}
+
+\begin{example}[title={Romberg Table for $\int_0^1 e^{-x^2}\,dx$}]
+Compute successive trapezoidal estimates and extrapolate:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} c|llll @{}}
+\toprule
+& $O(h^2)$ & $O(h^4)$ & $O(h^6)$ & $O(h^8)$ \\
+$n$ & Trapezoidal & Simpson-level & Boole-level & \\
+\midrule
+1 & $0.68394$ & & & \\
+2 & $0.73137$ & $0.74718$ & & \\
+4 & $0.74298$ & $0.74685$ & $0.74683$ & \\
+8 & $0.74586$ & $0.74682$ & $0.74682$ & $0.746824$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Reading the table:
+\begin{itemize}
+  \item Column 1: trapezoidal estimates (slow convergence).
+  \item Column 2: Richardson-extrapolated---these are Simpson-quality estimates.
+  \item Column 3: extrapolated again---Boole-quality ($O(h^6)$).
+  \item Column 4: extrapolated once more---$O(h^8)$.
+\end{itemize}
+
+By $n = 8$ (only 9 function evaluations for the trapezoidal column), the bottom-right entry achieves approximately \textbf{6 digits} of accuracy. Without Romberg, the trapezoidal rule with $n = 8$ gives only about 3 digits.
+\end{example}
+
+\subsection{Why Romberg Integration Is Attractive}
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Systematic:} it automatically generates higher-order results from simple trapezoidal estimates.
+  \item \textbf{Built-in error estimate:} by comparing entries in the same column, you can estimate how many digits are correct.
+  \item \textbf{Efficient:} when halving $h$, the new trapezoidal estimate reuses all previous function evaluations---you only need to evaluate $f$ at the \emph{new} midpoints.
+  \item \textbf{High accuracy from low-order building blocks:} the trapezoidal rule is trivial to implement, and Romberg lifts it to arbitrary high order.
+\end{itemize}
+
+\begin{takeaway}
+Romberg integration applies Richardson extrapolation systematically to the trapezoidal rule, building a table of increasingly accurate estimates. It turns the simple $O(h^2)$ trapezoidal rule into a high-order method, achieving many digits of accuracy with relatively few function evaluations. It also provides built-in error estimates.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 7.6
+% ============================================================
+\section{Gaussian Quadrature (Introduction)}
+
+All the methods so far---trapezoidal, Simpson's, Romberg---use \textbf{equally spaced} nodes. Gaussian quadrature asks a radical question: \emph{what if we choose the node locations optimally?}
+
+\subsection{The Clever Idea}
+
+With equally spaced nodes, the node locations are fixed and we can only adjust the weights. But if we are free to choose \textbf{both the nodes and the weights}, we can achieve much higher accuracy with the same number of function evaluations.
+
+\begin{keyconcept}[title={Gaussian Quadrature}]
+A Gaussian quadrature rule with $n$ nodes achieves degree of exactness $2n - 1$---it integrates all polynomials of degree up to $2n-1$ \textbf{exactly}.
+
+Compare: an equally-spaced rule with $n$ nodes can achieve at most degree of exactness $n$ (or $n+1$ with symmetry). Gaussian quadrature \textbf{doubles} the degree of exactness!
+\end{keyconcept}
+
+\subsection{How Does It Work?}
+
+The idea is to choose the nodes $x_1, x_2, \ldots, x_n$ and weights $w_1, w_2, \ldots, w_n$ simultaneously by requiring that the rule
+\[
+\int_{-1}^{1} f(x)\,dx \approx \sum_{i=1}^{n} w_i \, f(x_i)
+\]
+is exact for as many polynomials as possible. With $n$ nodes and $n$ weights, we have $2n$ free parameters, so we can satisfy $2n$ conditions---exactness for $f(x) = 1, x, x^2, \ldots, x^{2n-1}$.
+
+The nodes turn out to be the roots of certain special polynomials called \textbf{Legendre polynomials}, and the weights are determined by these roots.
+
+\subsection{Gauss--Legendre Quadrature: A Few Rules}
+
+The standard interval for Gaussian quadrature is $[-1, 1]$ (any other interval $[a, b]$ can be mapped to $[-1, 1]$ by a simple change of variables).
+
+\begin{center}
+\begin{tabular}{@{} cllc @{}}
+\toprule
+$n$ & \textbf{Nodes} $x_i$ & \textbf{Weights} $w_i$ & \textbf{Exact for degree $\leq$} \\
+\midrule
+1 & $0$ & $2$ & 1 \\[4pt]
+2 & $\pm 1/\sqrt{3} \approx \pm 0.5774$ & $1, \; 1$ & 3 \\[4pt]
+3 & $0, \; \pm\sqrt{3/5} \approx \pm 0.7746$ & $8/9, \; 5/9, \; 5/9$ & 5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{example}[title={Gauss--Legendre with 2 Nodes}]
+Estimate $\displaystyle\int_{-1}^{1} e^x\,dx$ using 2-point Gauss--Legendre.
+
+Exact value: $e^1 - e^{-1} = 2.35040$.
+
+Gauss--Legendre with $n = 2$:
+\[
+\int_{-1}^{1} e^x\,dx \approx 1 \cdot e^{-1/\sqrt{3}} + 1 \cdot e^{1/\sqrt{3}} = e^{-0.5774} + e^{0.5774} = 0.5615 + 1.7813 = 2.3428.
+\]
+
+Error: $|2.3504 - 2.3428| = 0.0076$.
+
+Compare: the trapezoidal rule with 2 nodes ($x = -1, 1$) gives $\frac{2}{2}(e^{-1} + e^1) = 0.3679 + 2.7183 = 3.0862$. Error: $0.736$---nearly \textbf{100 times worse}!
+\end{example}
+
+\subsection{Changing the Interval}
+
+Gauss--Legendre is formulated on $[-1, 1]$. To integrate over $[a, b]$, use the substitution $x = \frac{b-a}{2}t + \frac{a+b}{2}$:
+\[
+\int_a^b f(x)\,dx = \frac{b-a}{2}\int_{-1}^{1} f\!\left(\frac{b-a}{2}t + \frac{a+b}{2}\right)dt \approx \frac{b-a}{2}\sum_{i=1}^{n} w_i\, f\!\left(\frac{b-a}{2}t_i + \frac{a+b}{2}\right).
+\]
+
+\begin{example}[title={Gauss--Legendre on $[0, 1]$}]
+Estimate $\displaystyle\int_0^1 e^{-x^2}\,dx$ with 3-point Gauss--Legendre.
+
+Map $[0,1]$ to $[-1,1]$: $x = \frac{1}{2}t + \frac{1}{2}$, so $dx = \frac{1}{2}dt$.
+
+Nodes on $[-1, 1]$: $t_1 = -0.7746$, $t_2 = 0$, $t_3 = 0.7746$.
+
+Corresponding $x$-values: $x_1 = 0.1127$, $x_2 = 0.5$, $x_3 = 0.8873$.
+
+Weights: $w_1 = 5/9$, $w_2 = 8/9$, $w_3 = 5/9$.
+
+\begin{align*}
+\int_0^1 e^{-x^2}\,dx &\approx \frac{1}{2}\left[\frac{5}{9}e^{-0.1127^2} + \frac{8}{9}e^{-0.5^2} + \frac{5}{9}e^{-0.8873^2}\right] \\
+&= \frac{1}{2}\left[\frac{5}{9}(0.9874) + \frac{8}{9}(0.7788) + \frac{5}{9}(0.4559)\right] \\
+&= \frac{1}{2}\left[0.5486 + 0.6923 + 0.2533\right] = \frac{1}{2}(1.4942) = 0.74710.
+\end{align*}
+
+Error: $|0.74682 - 0.74710| \approx 0.0003$.
+
+With only \textbf{3 function evaluations}, Gauss--Legendre achieves an error of $3 \times 10^{-4}$. The composite trapezoidal rule needs roughly $n = 16$ (17 evaluations) to match this accuracy.
+\end{example}
+
+\subsection{When to Use Gaussian Quadrature}
+
+\begin{center}
+\begin{tabular}{@{} p{0.44\textwidth} p{0.44\textwidth} @{}}
+\toprule
+\textbf{Gaussian quadrature is ideal when\ldots} & \textbf{Equally-spaced rules are better when\ldots} \\
+\midrule
+You can evaluate $f$ at any point you choose. & The function values are given at fixed, equally-spaced points (data). \\[4pt]
+Function evaluations are expensive and you want maximum accuracy per evaluation. & Function evaluations are cheap and simplicity matters more. \\[4pt]
+The integrand is smooth on the interval. & The integrand has kinks or discontinuities (Gauss rules assume smoothness). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+Gaussian quadrature achieves maximum accuracy for a given number of function evaluations by choosing \textbf{both nodes and weights} optimally. With $n$ points, it is exact for polynomials of degree up to $2n-1$---double what equally-spaced rules achieve. It is the method of choice when function evaluations are expensive and the integrand is smooth.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 7 Summary}
+\addcontentsline{toc}{section}{Unit 7 Summary}
+
+This unit developed the main tools for computing $\int_a^b f(x)\,dx$ numerically.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{The trapezoidal rule} approximates $f$ by straight-line segments. The composite version is $O(h^2)$. Simple and robust.
+
+  \item \textbf{Simpson's rule} approximates $f$ by parabolas over pairs of subintervals. It is $O(h^4)$---two orders better than the trapezoidal rule for the same number of evaluations. The default rule for routine integration.
+
+  \item \textbf{Degree of exactness} characterizes which polynomials a rule integrates perfectly. Symmetric rules often get a ``bonus'' order. The midpoint rule provides a useful $O(h^2)$ alternative to the trapezoidal rule.
+
+  \item \textbf{Romberg integration} applies Richardson extrapolation systematically to the trapezoidal rule, building a table of increasingly accurate estimates. It turns the simple trapezoidal rule into a high-order method with built-in error estimates.
+
+  \item \textbf{Gaussian quadrature} chooses both nodes and weights optimally, achieving degree of exactness $2n-1$ with $n$ nodes. Gauss--Legendre rules are defined on $[-1,1]$ and can be mapped to any interval. Ideal when function evaluations are expensive and the integrand is smooth.
+\end{enumerate}
+
+\medskip
+The hierarchy of methods:
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+\textbf{Method} & \textbf{Accuracy} & \textbf{Best for} \\
+\midrule
+Trapezoidal & $O(h^2)$ & Data on a grid; foundation for Romberg \\
+Midpoint & $O(h^2)$ & Boundary-avoiding evaluations \\
+Simpson's & $O(h^4)$ & General-purpose routine integration \\
+Romberg & $O(h^{2k})$ & High accuracy from trapezoidal data \\
+Gauss--Legendre & $O(h^{2n})$ & Expensive-to-evaluate smooth functions \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Key contrast with Unit 6: integration is well-conditioned (smooths errors), while differentiation is ill-conditioned (amplifies errors). This is why numerical integration can routinely achieve 10--15 digits of accuracy, while numerical differentiation is limited to 8--11.
+
+\end{document}
