@@ -1,0 +1,717 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 1: Foundations}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 1 \\[0.3cm]}
+{\LARGE Foundations of Numerical Computing \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+What every student needs to know before diving into\\
+numerical methods: how computers handle numbers,\\
+where errors come from, and why it all matters.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 1.1
+% ============================================================
+\section{What Is Numerical Analysis?}
+
+\subsection{The Big Picture}
+
+Numerical analysis is the branch of mathematics that develops and studies \textbf{algorithms for solving mathematical problems approximately using a computer}. That last word---\emph{approximately}---is the key. In many areas of mathematics, we look for exact, closed-form answers: a precise formula, a clean fraction, an expression involving familiar functions. Numerical analysis accepts that, for the vast majority of real-world problems, such exact answers either do not exist or are impossibly hard to find.
+
+Consider a few examples:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Solving equations.} The quadratic formula gives us exact roots of $ax^2 + bx + c = 0$. But what about $x^5 - 3x + 1 = 0$? There is no general formula for fifth-degree polynomials (a fact proven by Abel and Galois in the 19th century). We need a numerical method.
+  \item \textbf{Computing integrals.} We can evaluate $\int_0^1 x^2\, dx = \tfrac{1}{3}$ exactly. But $\int_0^1 e^{-x^2}\, dx$ has no closed-form expression in terms of elementary functions. Again, we turn to numerical methods.
+  \item \textbf{Solving differential equations.} Almost every differential equation that models a real physical system---weather, fluid flow, chemical reactions---cannot be solved by hand. Numerical methods are the only practical approach.
+\end{itemize}
+
+\begin{keyconcept}
+Numerical analysis is \textbf{not} about getting sloppy answers. It is about getting \textbf{reliable, accurate approximations} when exact solutions are out of reach---and understanding exactly how good (or bad) those approximations are.
+\end{keyconcept}
+
+\subsection{Why We Need Numerical Methods}
+
+Three fundamental reasons drive the need for numerical methods:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Exact solutions don't exist.} As noted above, most equations arising in science and engineering simply cannot be solved by hand.
+  \item \textbf{Exact solutions exist but are impractical.} Sometimes a formula exists in principle, but it involves millions of terms, special functions, or infinite series that must be truncated anyway.
+  \item \textbf{We only have data, not formulas.} In many applications (experimental science, sensor data, financial markets), we don't even have an equation---we have measured numbers. Numerical methods let us work directly with this data.
+\end{enumerate}
+
+\subsection{Exact vs.\ Approximate Solutions}
+
+It is helpful to clearly separate two worlds:
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+& \textbf{Exact (Symbolic)} & \textbf{Approximate (Numerical)} \\
+\midrule
+Answer form & Formula or expression & A number (with known precision) \\
+Example & $x = \dfrac{-b \pm \sqrt{b^2 - 4ac}}{2a}$ & $x \approx 3.14159265$ \\
+Tools & Algebra, calculus, pen and paper & Algorithms, computers \\
+Limitations & Only works for "nice" problems & Always possible, but never perfectly exact \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+Neither approach is better in an absolute sense. They complement each other. In this bootcamp, we focus on the numerical side, but we will always use our knowledge of exact mathematics to \emph{check} and \emph{understand} the numerical results.
+
+\subsection{The Role of the Computer}
+
+Numerical analysis existed long before electronic computers---people used hand calculations, tables, and mechanical calculators for centuries. But the modern computer has transformed the field:
+
+\begin{itemize}[leftmargin=2em]
+  \item Computers can perform billions of arithmetic operations per second.
+  \item They execute the same algorithm tirelessly, without human error in the arithmetic.
+  \item They allow us to tackle problems of enormous size (millions of equations, massive data sets).
+\end{itemize}
+
+However, computers introduce their own challenges:
+\begin{itemize}[leftmargin=2em]
+  \item They store numbers in a \textbf{finite} format (floating-point), so every number is slightly rounded.
+  \item They perform arithmetic that is \textbf{almost} like real-number arithmetic, but not quite.
+  \item Small errors can sometimes grow and corrupt the entire calculation.
+\end{itemize}
+
+Understanding these limitations is one of the central goals of this unit.
+
+\begin{takeaway}
+Numerical analysis lives at the intersection of mathematics and computing. Its goal is to solve mathematical problems approximately, efficiently, and with known accuracy.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 1.2
+% ============================================================
+\section{Number Representation and Floating-Point Arithmetic}
+
+\subsection{How Do Computers Store Numbers?}
+
+Before we can do any computation, we need to understand a fundamental fact: \textbf{computers cannot store most real numbers exactly}. The set of real numbers $\mathbb{R}$ is uncountably infinite, but a computer has only a finite amount of memory. So it works with a finite set of numbers, and every real number must be \emph{rounded} to the nearest representable number.
+
+\subsection{Binary and Decimal Systems}
+
+We humans normally write numbers in \textbf{base 10} (decimal). For example:
+\[
+347.25 = 3 \times 10^2 + 4 \times 10^1 + 7 \times 10^0 + 2 \times 10^{-1} + 5 \times 10^{-2}.
+\]
+
+Computers work in \textbf{base 2} (binary), using only the digits 0 and 1. In binary:
+\[
+101.01_2 = 1 \times 2^2 + 0 \times 2^1 + 1 \times 2^0 + 0 \times 2^{-1} + 1 \times 2^{-2} = 4 + 0 + 1 + 0 + 0.25 = 5.25.
+\]
+
+The key insight is that the \emph{same idea} of positional notation applies---only the base changes.
+
+\begin{keyconcept}
+In base $\beta$, a number is written as a sum of powers of $\beta$. Computers use $\beta = 2$ because electronic circuits naturally represent two states: on (1) and off (0).
+\end{keyconcept}
+
+\subsection{Floating-Point Representation}
+
+Rather than storing a fixed number of digits before and after the decimal point, computers use \textbf{floating-point} notation. This is analogous to scientific notation:
+
+\[
+\underbrace{6.022}_{\text{significand}} \times \underbrace{10^{23}}_{\text{base and exponent}} \quad \longleftrightarrow \quad \underbrace{1.011010\ldots}_{\text{significand (binary)}} \times \underbrace{2^{e}}_{\text{base and exponent}}
+\]
+
+A floating-point number is stored as three pieces:
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Sign bit:} determines whether the number is positive or negative.
+  \item \textbf{Exponent:} determines the magnitude (how big or small the number is).
+  \item \textbf{Significand (mantissa):} determines the precision (the ``digits'' of the number).
+\end{enumerate}
+
+\subsubsection{The IEEE 754 Standard (Basics)}
+
+The most widely used floating-point format is defined by the \textbf{IEEE 754} standard. The two most common formats are:
+
+\begin{center}
+\begin{tabular}{@{} lccc @{}}
+\toprule
+\textbf{Format} & \textbf{Sign} & \textbf{Exponent bits} & \textbf{Significand bits} \\
+\midrule
+Single precision (32-bit) & 1 bit & 8 bits & 23 bits \\
+Double precision (64-bit) & 1 bit & 11 bits & 52 bits \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Most scientific computing uses \textbf{double precision}, which gives roughly 15--16 significant decimal digits of accuracy.
+
+\begin{example}
+The number $0.1$ in decimal is actually a repeating fraction in binary:
+\[
+0.1_{10} = 0.0001100110011\overline{0011}_2 \ldots
+\]
+Since the pattern repeats forever, the computer must truncate it. The stored value is \textbf{not exactly} $0.1$---it is the closest representable double-precision number, which differs from $0.1$ by about $5.5 \times 10^{-18}$.
+
+This is why, in many programming languages, \texttt{0.1 + 0.2} does not equal exactly \texttt{0.3}!
+\end{example}
+
+\subsection{Machine Epsilon}
+
+There is a fundamental quantity that captures the precision limit of floating-point arithmetic:
+
+\begin{keyconcept}
+\textbf{Machine epsilon} $\varepsilon_{\mathrm{mach}}$ is the smallest positive floating-point number such that
+\[
+\mathrm{fl}(1 + \varepsilon_{\mathrm{mach}}) > 1,
+\]
+where $\mathrm{fl}(\cdot)$ denotes rounding to the nearest floating-point number. Equivalently, it is half the distance between 1 and the next larger floating-point number.
+\end{keyconcept}
+
+For double precision: $\varepsilon_{\mathrm{mach}} \approx 1.11 \times 10^{-16}$.
+
+This means that \textbf{every} floating-point operation introduces a relative error of at most $\varepsilon_{\mathrm{mach}}$. Think of it as the ``resolution'' of the number system---you can never distinguish two numbers that differ by less than this relative amount.
+
+\subsection{Rounding Rules}
+
+When a real number $x$ is stored in floating-point, it is rounded to the nearest representable number $\mathrm{fl}(x)$. The standard rounding rule is \textbf{round to nearest, ties to even} (also called ``banker's rounding'').
+
+The fundamental rounding model is:
+\[
+\mathrm{fl}(x) = x(1 + \delta), \quad \text{where } |\delta| \leq \varepsilon_{\mathrm{mach}}.
+\]
+
+This says: the stored number $\mathrm{fl}(x)$ differs from the true number $x$ by a tiny relative factor. This model is the starting point for all error analysis in floating-point computation.
+
+\begin{takeaway}
+Computers store numbers in floating-point format with finite precision. Double precision gives about 16 decimal digits of accuracy. The key quantity is machine epsilon $\varepsilon_{\mathrm{mach}} \approx 10^{-16}$, which sets the fundamental precision limit for every calculation.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 1.3
+% ============================================================
+\section{Sources of Error}
+
+Every numerical computation involves error. The first step to controlling error is \textbf{understanding where it comes from}. There are two main types.
+
+\subsection{Round-Off Error}
+
+\textbf{Round-off error} arises because the computer stores numbers in finite precision. Every time we store a number or perform an arithmetic operation, tiny rounding errors are introduced.
+
+\begin{itemize}[leftmargin=2em]
+  \item The number $\pi = 3.14159265358979\ldots$ cannot be stored exactly. It is rounded to a finite number of digits.
+  \item Adding two numbers may produce a result that requires more digits than the format allows, so the answer is rounded.
+  \item These individual errors are tiny (of order $\varepsilon_{\mathrm{mach}}$), but they can accumulate over millions of operations.
+\end{itemize}
+
+\subsection{Truncation Error}
+
+\textbf{Truncation error} arises when we replace an exact mathematical process with a finite approximation. This has nothing to do with the computer's precision---it is a mathematical choice.
+
+\begin{example}[title={Truncation Error in Action}]
+The derivative of $f(x)$ is defined as a limit:
+\[
+f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}.
+\]
+On a computer, we cannot take $h \to 0$. Instead, we use a small but nonzero $h$:
+\[
+f'(x) \approx \frac{f(x+h) - f(x)}{h}.
+\]
+The difference between the true derivative and this approximation is the \textbf{truncation error}. It comes from ``truncating'' the limiting process---stopping at a finite step instead of going all the way to the limit.
+\end{example}
+
+Other common sources of truncation error:
+\begin{itemize}[leftmargin=2em]
+  \item Replacing an infinite series by a finite sum (e.g., $e^x = 1 + x + \frac{x^2}{2!} + \cdots$ truncated after $n$ terms).
+  \item Replacing a smooth curve by straight-line segments (as in numerical integration).
+  \item Replacing a continuous domain by a finite grid of points (as in solving differential equations).
+\end{itemize}
+
+\subsection{Truncation Error vs.\ Round-Off Error}
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+& \textbf{Truncation Error} & \textbf{Round-Off Error} \\
+\midrule
+Cause & Approximating a math process & Finite precision of computer \\
+Controlled by & Using finer approximation (smaller $h$, more terms) & Using higher precision \\
+Behavior as $h \to 0$ & Decreases & Eventually increases! \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{warning}
+There is often a \textbf{tension} between truncation and round-off error. Making $h$ smaller reduces truncation error but eventually increases round-off error (because you subtract nearly equal numbers). Finding the right balance is a recurring theme in numerical analysis.
+\end{warning}
+
+\subsection{Absolute and Relative Error}
+
+To quantify how far an approximation $\hat{x}$ is from the true value $x$, we use two measures:
+
+\begin{keyconcept}
+\begin{align*}
+\text{Absolute error} &= |x - \hat{x}| \\[6pt]
+\text{Relative error} &= \frac{|x - \hat{x}|}{|x|} \quad (x \neq 0)
+\end{align*}
+\end{keyconcept}
+
+\begin{example}
+Suppose the true value is $x = 1000$ and our approximation is $\hat{x} = 999$.
+\begin{itemize}
+  \item Absolute error $= |1000 - 999| = 1$.
+  \item Relative error $= 1/1000 = 0.001 = 0.1\%$.
+\end{itemize}
+
+Now suppose $x = 0.001$ and $\hat{x} = 0$.
+\begin{itemize}
+  \item Absolute error $= 0.001$ (same as before!).
+  \item Relative error $= 0.001/0.001 = 1 = 100\%$.
+\end{itemize}
+
+The absolute error is the same in both cases, but the relative error tells a very different story. When $x$ is small, being off by $0.001$ is a \textbf{total disaster}. Relative error captures this.
+\end{example}
+
+\medskip
+In most of numerical analysis, \textbf{relative error is the more meaningful measure}. It tells us how many correct digits we have in our answer.
+
+\subsection{Significant Digits}
+
+We say that $\hat{x}$ approximates $x$ to \textbf{$n$ significant digits} if the relative error satisfies:
+\[
+\frac{|x - \hat{x}|}{|x|} < 5 \times 10^{-n}.
+\]
+
+For example, $\hat{x} = 3.1416$ approximates $\pi = 3.14159\ldots$ to 5 significant digits, because the relative error is approximately $8.5 \times 10^{-6} < 5 \times 10^{-5}$.
+
+\begin{takeaway}
+Every numerical result carries error from two sources: truncation (mathematical approximation) and round-off (finite computer precision). Relative error, not absolute error, is usually the right way to measure accuracy.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 1.4
+% ============================================================
+\section{Error Propagation}
+
+Understanding where errors come from (Section 1.3) is only half the battle. We also need to understand \textbf{how errors grow} as they pass through a sequence of calculations.
+
+\subsection{Error in Arithmetic Operations}
+
+Suppose we have two numbers $a$ and $b$, each with some small error: $\hat{a} = a + \delta_a$ and $\hat{b} = b + \delta_b$. How does the error affect basic operations?
+
+\subsubsection{Addition and Subtraction}
+
+\[
+\hat{a} + \hat{b} = (a + b) + (\delta_a + \delta_b).
+\]
+The \textbf{absolute error} of a sum (or difference) is at most the \textbf{sum of the absolute errors}. This seems harmless enough. But consider the \emph{relative} error of a subtraction:
+\[
+\hat{a} - \hat{b} = (a - b) + (\delta_a - \delta_b).
+\]
+If $a \approx b$, then $a - b$ is very small, but $\delta_a - \delta_b$ stays the same size. The relative error \textbf{explodes}.
+
+\subsubsection{Multiplication and Division}
+
+For multiplication:
+\[
+\hat{a} \cdot \hat{b} \approx a \cdot b \left(1 + \frac{\delta_a}{a} + \frac{\delta_b}{b}\right).
+\]
+The \textbf{relative error} of a product is roughly the \textbf{sum of the relative errors}. Multiplication and division are generally well-behaved for error propagation.
+
+\subsection{Catastrophic Cancellation}
+
+The most dangerous operation in floating-point arithmetic is \textbf{subtracting two nearly equal numbers}. This is called \textbf{catastrophic cancellation}.
+
+\begin{example}[title={Catastrophic Cancellation}]
+Suppose we compute $f(x) = \sqrt{x^2 + 1} - x$ for large $x$.
+
+Let $x = 10^8$. In exact arithmetic:
+\[
+\sqrt{(10^8)^2 + 1} - 10^8 = \sqrt{10^{16} + 1} - 10^8 \approx 5 \times 10^{-9}.
+\]
+
+But in double precision, $\sqrt{10^{16} + 1}$ is stored as something like $1.00000000000000\mathbf{00} \times 10^{8}$, and subtracting $10^8$ gives $0$---or a number with very few correct digits.
+
+\textbf{The fix:} Rewrite the expression to avoid the cancellation. Multiply and divide by the conjugate:
+\[
+\sqrt{x^2 + 1} - x = \frac{(\sqrt{x^2+1} - x)(\sqrt{x^2+1} + x)}{\sqrt{x^2+1} + x} = \frac{1}{\sqrt{x^2+1} + x}.
+\]
+This equivalent formula involves \emph{no} subtraction of nearly equal numbers and gives full accuracy.
+\end{example}
+
+\begin{keyconcept}
+\textbf{Catastrophic cancellation} occurs when subtracting nearly equal floating-point numbers, causing a dramatic loss of significant digits. The remedy is to algebraically rearrange the formula to avoid the problematic subtraction.
+\end{keyconcept}
+
+\subsection{A Simple Model of Error Amplification}
+
+Consider computing a function $y = f(x)$, where $x$ has a small error $\delta_x$. By a first-order Taylor expansion:
+\[
+f(x + \delta_x) \approx f(x) + f'(x)\,\delta_x.
+\]
+So the absolute error in $y$ is approximately $|f'(x)|\,|\delta_x|$. The relative error is:
+\[
+\frac{|f(x + \delta_x) - f(x)|}{|f(x)|} \approx \left|\frac{x\,f'(x)}{f(x)}\right| \cdot \frac{|\delta_x|}{|x|}.
+\]
+
+The factor $\left|\frac{x\,f'(x)}{f(x)}\right|$ is called the \textbf{condition number} of $f$ at $x$ (more on this in the next section). It tells us how much the relative error gets amplified.
+
+\begin{takeaway}
+Errors propagate through calculations. Addition and subtraction can amplify absolute errors (especially via cancellation), while multiplication and division are gentler. Catastrophic cancellation---subtracting nearly equal numbers---is the single most dangerous floating-point pitfall.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 1.5
+% ============================================================
+\section{Stability and Conditioning}
+
+Two closely related but distinct concepts sit at the heart of numerical analysis: the \textbf{conditioning} of a problem and the \textbf{stability} of an algorithm. Confusing them is a common beginner mistake, so let us be very clear about the distinction.
+
+\subsection{Well-Conditioned vs.\ Ill-Conditioned Problems}
+
+\textbf{Conditioning} is a property of the \emph{mathematical problem itself}, independent of any algorithm or computer.
+
+\begin{keyconcept}
+A problem is \textbf{well-conditioned} if small changes in the input produce only small changes in the output.
+
+A problem is \textbf{ill-conditioned} if small changes in the input can produce large changes in the output.
+\end{keyconcept}
+
+\begin{example}[title={Well-Conditioned Problem}]
+Consider $f(x) = 2x + 1$. If $x = 3$ and we perturb it slightly to $x = 3.001$:
+\[
+f(3) = 7, \quad f(3.001) = 7.002.
+\]
+A $0.03\%$ change in input produces a $0.03\%$ change in output. The problem is well-conditioned.
+\end{example}
+
+\begin{example}[title={Ill-Conditioned Problem}]
+Consider finding the roots of the polynomial $p(x) = (x-1)^{10}$. The only root is $x = 1$ (with multiplicity 10). But if we perturb a coefficient slightly---say compute the roots of $p(x) + 10^{-10}$---the roots change dramatically, scattering across the complex plane.
+
+A tiny perturbation in the problem produces a huge change in the answer. The problem is ill-conditioned.
+\end{example}
+
+Ill-conditioning is a \textbf{warning sign}: no algorithm, no matter how clever, can solve an ill-conditioned problem to high accuracy if the input data has any uncertainty.
+
+\subsection{The Condition Number}
+
+We saw in Section 1.4 that for a function $y = f(x)$, the amplification factor for relative error is:
+\[
+\kappa = \left|\frac{x\,f'(x)}{f(x)}\right|.
+\]
+This is called the \textbf{condition number}. It tells you:
+
+\begin{quote}
+\emph{If the input has a relative error of $\epsilon$, then the output has a relative error of roughly $\kappa \cdot \epsilon$.}
+\end{quote}
+
+\begin{itemize}[leftmargin=2em]
+  \item $\kappa \approx 1$: well-conditioned. Errors are preserved (not amplified).
+  \item $\kappa \gg 1$: ill-conditioned. Errors are severely amplified.
+\end{itemize}
+
+\begin{example}
+For $f(x) = \sqrt{x}$ at $x > 0$:
+\[
+\kappa = \left|\frac{x \cdot \frac{1}{2\sqrt{x}}}{\sqrt{x}}\right| = \left|\frac{x}{2x}\right| = \frac{1}{2}.
+\]
+The condition number is $1/2$ for any positive $x$. Computing a square root is \textbf{always well-conditioned}---errors are actually reduced!
+\end{example}
+
+For matrices and linear systems (Unit 3), the condition number has a more specific definition, but the idea is exactly the same: it measures \emph{sensitivity of the answer to perturbations in the data}.
+
+\subsection{Stable vs.\ Unstable Algorithms}
+
+\textbf{Stability} is a property of the \emph{algorithm}, not the problem.
+
+\begin{keyconcept}
+An algorithm is \textbf{stable} if it does not introduce errors significantly larger than those that are unavoidable (due to the conditioning of the problem and the precision of the arithmetic).
+
+An algorithm is \textbf{unstable} if it amplifies errors unnecessarily, producing results far worse than the problem's conditioning would predict.
+\end{keyconcept}
+
+Think of it this way:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Conditioning} asks: ``Is this problem inherently sensitive?''
+  \item \textbf{Stability} asks: ``Does this algorithm make things worse than they need to be?''
+\end{itemize}
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+ & \textbf{Stable Algorithm} & \textbf{Unstable Algorithm} \\
+\midrule
+Well-conditioned problem & Accurate result & Poor result (algorithm's fault) \\
+Ill-conditioned problem  & Limited accuracy (problem's fault) & Very poor result (both at fault) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{example}[title={Two Formulas, Same Problem, Different Stability}]
+Recall from Section 1.4 the two formulas for $f(x) = \sqrt{x^2+1} - x$:
+\begin{align*}
+\text{Formula A:} \quad & \sqrt{x^2+1} - x && \text{(unstable for large } x\text{)} \\
+\text{Formula B:} \quad & \frac{1}{\sqrt{x^2+1} + x} && \text{(stable for all } x > 0\text{)}
+\end{align*}
+Both compute the same mathematical function. But Formula A is \textbf{numerically unstable} for large $x$ because of catastrophic cancellation, while Formula B is \textbf{stable}.
+\end{example}
+
+\subsection{The Goal of Numerical Analysis}
+
+We can now state the overarching goal of this entire bootcamp:
+
+\begin{takeaway}
+For any given problem, we want to:
+\begin{enumerate}
+  \item Understand its \textbf{conditioning} (is the problem inherently sensitive?).
+  \item Design or choose a \textbf{stable algorithm} (one that doesn't make things worse).
+  \item Understand the \textbf{convergence} and \textbf{error behavior} of our method.
+\end{enumerate}
+A good numerical analyst matches a stable algorithm to a well-conditioned formulation of the problem.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 1.6
+% ============================================================
+\section{Big-O Notation and Convergence}
+
+\subsection{Big-O Notation: How Fast Do Things Grow (or Shrink)?}
+
+In numerical analysis, we constantly need to describe how quickly an error decreases (or an algorithm's cost increases) as we change some parameter. \textbf{Big-O notation} provides a clean way to do this.
+
+\begin{keyconcept}
+We write $f(h) = O(h^n)$ as $h \to 0$ to mean: there exists a constant $C > 0$ such that
+\[
+|f(h)| \leq C\,|h|^n
+\]
+for all sufficiently small $h$. In plain English: $f(h)$ shrinks \textbf{at least as fast as} $h^n$.
+\end{keyconcept}
+
+\begin{example}
+Recall the forward difference approximation for $f'(x)$:
+\[
+\frac{f(x+h) - f(x)}{h} = f'(x) + \frac{h}{2}f''(x) + O(h^2).
+\]
+The error term is $O(h)$. This tells us:
+\begin{itemize}
+  \item If we halve $h$, the error roughly halves.
+  \item The method is \textbf{first-order accurate}---the error behaves like $h^1$.
+\end{itemize}
+
+For the central difference:
+\[
+\frac{f(x+h) - f(x-h)}{2h} = f'(x) + O(h^2).
+\]
+The error is $O(h^2)$, so halving $h$ cuts the error by roughly a factor of 4. This is \textbf{second-order accurate}---a significant improvement.
+\end{example}
+
+\subsection{What It Means for a Method to Converge}
+
+Many numerical methods produce a sequence of approximations $x_1, x_2, x_3, \ldots$ that (we hope) get closer and closer to the true answer $x^*$.
+
+\begin{keyconcept}
+A method \textbf{converges} if the error $e_n = |x_n - x^*|$ tends to zero as $n \to \infty$:
+\[
+\lim_{n \to \infty} |x_n - x^*| = 0.
+\]
+\end{keyconcept}
+
+Convergence alone is not enough---we also care about \emph{how fast} the method converges.
+
+\subsection{Rate of Convergence}
+
+The rate tells us how the error at step $n+1$ relates to the error at step $n$.
+
+\begin{keyconcept}
+A convergent sequence has \textbf{order of convergence} $p$ if there exists a constant $C > 0$ such that
+\[
+|e_{n+1}| \leq C\,|e_n|^p
+\]
+for large $n$, where $e_n = |x_n - x^*|$ is the error at step $n$.
+\end{keyconcept}
+
+The most important cases:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Linear convergence ($p = 1$):} Each step reduces the error by a constant factor. If $C = 0.5$, each step roughly halves the error. To gain one more digit of accuracy, you need a fixed number of additional steps.
+
+  \textit{Example:} The Bisection Method (Unit 2) converges linearly.
+
+  \item \textbf{Quadratic convergence ($p = 2$):} The number of correct digits roughly \emph{doubles} at each step. This is dramatically faster.
+
+  \textit{Example:} Newton's Method (Unit 2), near a simple root, converges quadratically.
+\end{itemize}
+
+\begin{example}[title={Linear vs.\ Quadratic Convergence}]
+Suppose the initial error is $e_0 = 0.1$, and we compare linear ($C = 0.5$) vs.\ quadratic ($C = 1$) convergence:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} cll @{}}
+\toprule
+\textbf{Step} $n$ & \textbf{Linear} ($e_n \approx 0.5^n \cdot 0.1$) & \textbf{Quadratic} ($e_n \approx 0.1^{2^n}$) \\
+\midrule
+0 & $10^{-1}$ & $10^{-1}$ \\
+1 & $5 \times 10^{-2}$ & $10^{-2}$ \\
+2 & $2.5 \times 10^{-2}$ & $10^{-4}$ \\
+3 & $1.25 \times 10^{-2}$ & $10^{-8}$ \\
+4 & $6.25 \times 10^{-3}$ & $10^{-16}$ (machine epsilon!) \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Quadratic convergence reaches machine precision in just 4 steps! Linear convergence would need about 50 steps to get there.
+\end{example}
+
+\subsection{Order of Approximation}
+
+When we say a method has $n$-th order accuracy, we mean its error goes like $O(h^n)$ where $h$ is some discretization parameter (step size, grid spacing, etc.).
+
+The practical rule of thumb:
+\begin{itemize}[leftmargin=2em]
+  \item A \textbf{first-order method}: halving $h$ halves the error.
+  \item A \textbf{second-order method}: halving $h$ cuts the error by 4.
+  \item A \textbf{fourth-order method}: halving $h$ cuts the error by 16.
+\end{itemize}
+
+Higher-order methods give you much more accuracy for the same computational effort, which is why they are so highly prized.
+
+\begin{takeaway}
+Big-O notation describes how fast errors shrink (or costs grow). A method converges if its errors tend to zero; the \textbf{rate of convergence} tells us how fast. Quadratic convergence is dramatically faster than linear, and higher-order methods give much more accuracy for the same effort. These concepts will appear in every unit that follows.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 1 Summary}
+\addcontentsline{toc}{section}{Unit 1 Summary}
+
+This unit laid the groundwork for everything that follows. Here are the essential ideas:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Numerical analysis} is about solving mathematical problems approximately, efficiently, and with known accuracy.
+
+  \item \textbf{Floating-point arithmetic} stores numbers with finite precision. Machine epsilon ($\varepsilon_{\mathrm{mach}} \approx 10^{-16}$ for double precision) sets the fundamental limit.
+
+  \item Every result carries \textbf{error} from two sources: \textbf{truncation} (approximating a mathematical process) and \textbf{round-off} (finite computer precision). These often pull in opposite directions.
+
+  \item Errors propagate through calculations. The most dangerous pitfall is \textbf{catastrophic cancellation}---subtracting nearly equal numbers.
+
+  \item \textbf{Conditioning} (a property of the problem) and \textbf{stability} (a property of the algorithm) are distinct but equally important. The goal is to pair a stable algorithm with a well-conditioned formulation.
+
+  \item \textbf{Convergence rate} and \textbf{order of accuracy} describe how fast a method improves. These concepts---Big-O notation, linear vs.\ quadratic convergence---will recur in every subsequent unit.
+\end{enumerate}
+
+\end{document}
