@@ -1,0 +1,733 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 4: Interpolation}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 4 \\[0.3cm]}
+{\LARGE Interpolation \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+Given a set of data points, how do we construct\\
+a smooth curve that passes exactly through each one?\\
+Polynomials, divided differences, and splines.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 4.1
+% ============================================================
+\section{What Is Interpolation?}
+
+\subsection{The Problem}
+
+Suppose you have a collection of data points---pairs $(x_i, y_i)$ for $i = 0, 1, \ldots, n$---and you want to find a function that passes \textbf{exactly through all of them}. This is the \textbf{interpolation problem}.
+
+More precisely: given $n+1$ distinct points
+\[
+(x_0, y_0), \quad (x_1, y_1), \quad \ldots, \quad (x_n, y_n),
+\]
+find a function $p(x)$ such that
+\[
+p(x_i) = y_i \quad \text{for all } i = 0, 1, \ldots, n.
+\]
+
+The points $x_0, x_1, \ldots, x_n$ are called \textbf{nodes} (or \textbf{abscissas}), and the values $y_0, y_1, \ldots, y_n$ are the corresponding \textbf{data values}.
+
+\subsection{Where Does Interpolation Arise?}
+
+Interpolation appears whenever we need to estimate values \textbf{between} known data points:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Experimental data:} A sensor records temperature every hour. What was the temperature at 2:37 PM?
+  \item \textbf{Tabulated functions:} Before computers, mathematical tables listed function values at discrete points. Interpolation filled the gaps.
+  \item \textbf{Computer graphics:} Smooth curves and surfaces are built by interpolating a set of control points.
+  \item \textbf{Numerical methods:} Many algorithms (integration, differentiation, ODE solvers) work by first interpolating the data, then operating on the interpolant.
+\end{itemize}
+
+\subsection{Interpolation vs.\ Approximation vs.\ Curve Fitting}
+
+These three terms are often confused. Let us be precise:
+
+\begin{center}
+\begin{tabular}{@{} p{0.15\textwidth} p{0.37\textwidth} p{0.37\textwidth} @{}}
+\toprule
+\textbf{Task} & \textbf{Requirement} & \textbf{When to use} \\
+\midrule
+Interpolation & Curve passes \textbf{exactly} through every data point. & Data is exact (no noise). Few data points. \\[6pt]
+Approximation & Curve is ``close'' to a function, but need not pass through any specific point. & Simplifying a complicated function. \\[6pt]
+Curve fitting & Curve is ``close'' to the data on average, but may not pass through any individual point. & Data is noisy. Many data points (Unit 5). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyconcept}
+Interpolation demands $p(x_i) = y_i$ exactly. This is the right approach when the data is \textbf{exact and trusted}. When the data is noisy, forcing the curve through every point would ``fit the noise''---in that case, least-squares fitting (Unit 5) is better.
+\end{keyconcept}
+
+\subsection{Why Polynomials?}
+
+Among all possible interpolating functions, \textbf{polynomials} are the default choice because:
+\begin{itemize}[leftmargin=2em]
+  \item They are easy to evaluate (just additions and multiplications).
+  \item They are easy to differentiate and integrate.
+  \item They can approximate any continuous function arbitrarily well (Weierstrass Approximation Theorem).
+  \item Through $n+1$ distinct points, there is \textbf{exactly one} polynomial of degree $\leq n$ that interpolates them.
+\end{itemize}
+
+\begin{takeaway}
+Interpolation constructs a function that passes exactly through given data points. We usually use polynomials because they are simple, flexible, and unique for a given set of points. The key question is: \emph{which} polynomial, and \emph{how} do we construct it efficiently?
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 4.2
+% ============================================================
+\section{Lagrange Interpolation}
+
+The Lagrange form provides a beautiful, explicit formula for the unique polynomial that passes through a given set of points. It is conceptually the clearest way to write down the interpolating polynomial.
+
+\subsection{Building Blocks: The Lagrange Basis Polynomials}
+
+The trick is to construct $n+1$ special polynomials $L_0(x), L_1(x), \ldots, L_n(x)$, each of degree $n$, with the property:
+\[
+L_i(x_j) = \begin{cases} 1 & \text{if } j = i, \\ 0 & \text{if } j \neq i. \end{cases}
+\]
+
+In words: $L_i$ equals 1 at node $x_i$ and equals 0 at every other node. These are the \textbf{Lagrange basis polynomials}.
+
+The formula for $L_i(x)$ is:
+\[
+L_i(x) = \prod_{\substack{j=0 \\ j \neq i}}^{n} \frac{x - x_j}{x_i - x_j}.
+\]
+
+This looks dense, but the idea is simple: the numerator is zero at every $x_j$ except $x_i$ (because of the $(x - x_j)$ factors), and the denominator scales things so that $L_i(x_i) = 1$.
+
+\begin{example}[title={Lagrange Basis for 3 Points}]
+Suppose we have three nodes: $x_0 = 1$, $x_1 = 2$, $x_2 = 4$. The three basis polynomials are:
+\begin{align*}
+L_0(x) &= \frac{(x - 2)(x - 4)}{(1 - 2)(1 - 4)} = \frac{(x-2)(x-4)}{(-1)(-3)} = \frac{(x-2)(x-4)}{3}, \\[6pt]
+L_1(x) &= \frac{(x - 1)(x - 4)}{(2 - 1)(2 - 4)} = \frac{(x-1)(x-4)}{(1)(-2)} = -\frac{(x-1)(x-4)}{2}, \\[6pt]
+L_2(x) &= \frac{(x - 1)(x - 2)}{(4 - 1)(4 - 2)} = \frac{(x-1)(x-2)}{(3)(2)} = \frac{(x-1)(x-2)}{6}.
+\end{align*}
+
+You can verify: $L_0(1) = 1$, $L_0(2) = 0$, $L_0(4) = 0$, and similarly for $L_1$ and $L_2$.
+\end{example}
+
+\subsection{The Interpolating Polynomial}
+
+Once we have the basis polynomials, the interpolating polynomial is simply:
+
+\begin{keyconcept}[title={Lagrange Interpolating Polynomial}]
+\[
+p_n(x) = \sum_{i=0}^{n} y_i \, L_i(x) = \sum_{i=0}^{n} y_i \prod_{\substack{j=0 \\ j \neq i}}^{n} \frac{x - x_j}{x_i - x_j}.
+\]
+This polynomial has degree $\leq n$ and satisfies $p_n(x_i) = y_i$ for all $i$.
+\end{keyconcept}
+
+Why does this work? At any node $x_k$:
+\[
+p_n(x_k) = \sum_{i=0}^{n} y_i \, L_i(x_k) = y_k \cdot 1 + \sum_{i \neq k} y_i \cdot 0 = y_k. \quad \checkmark
+\]
+
+\begin{example}[title={Lagrange Interpolation: Complete Example}]
+Interpolate the data:
+\begin{center}
+\begin{tabular}{c|ccc}
+$x_i$ & 1 & 2 & 4 \\
+\hline
+$y_i$ & 2 & 3 & 7
+\end{tabular}
+\end{center}
+
+Using the basis polynomials from the previous example:
+\begin{align*}
+p_2(x) &= 2 \cdot \frac{(x-2)(x-4)}{3} + 3 \cdot \left(-\frac{(x-1)(x-4)}{2}\right) + 7 \cdot \frac{(x-1)(x-2)}{6}.
+\end{align*}
+
+Expanding and simplifying (or using the expression as-is for evaluation):
+\[
+p_2(x) = \frac{2}{3}(x-2)(x-4) - \frac{3}{2}(x-1)(x-4) + \frac{7}{6}(x-1)(x-2).
+\]
+
+Let us verify at the nodes:
+\begin{align*}
+p_2(1) &= \frac{2}{3}(-1)(-3) - \frac{3}{2}(0)(-3) + \frac{7}{6}(0)(-1) = \frac{2}{3}(3) = 2. \;\checkmark \\
+p_2(2) &= \frac{2}{3}(0)(-2) - \frac{3}{2}(1)(-2) + \frac{7}{6}(1)(0) = 0 + 3 + 0 = 3. \;\checkmark \\
+p_2(4) &= \frac{2}{3}(2)(0) - \frac{3}{2}(3)(0) + \frac{7}{6}(3)(2) = 0 + 0 + 7 = 7. \;\checkmark
+\end{align*}
+
+We can now estimate, say, $y$ at $x = 3$:
+\[
+p_2(3) = \frac{2}{3}(1)(-1) - \frac{3}{2}(2)(-1) + \frac{7}{6}(2)(1) = -\frac{2}{3} + 3 + \frac{7}{3} = -\frac{2}{3} + \frac{9}{3} + \frac{7}{3} = \frac{14}{3} \approx 4.67.
+\]
+\end{example}
+
+\subsection{Uniqueness of the Interpolating Polynomial}
+
+An important theoretical fact:
+
+\begin{keyconcept}[title={Uniqueness Theorem}]
+Given $n+1$ distinct nodes $x_0, x_1, \ldots, x_n$ and corresponding values $y_0, y_1, \ldots, y_n$, there is \textbf{exactly one} polynomial of degree $\leq n$ that passes through all the points.
+\end{keyconcept}
+
+This means that no matter \emph{how} we construct the polynomial---Lagrange form, Newton form (Section 4.3), or solving a linear system---we always get the same polynomial. The different methods are just different ways of writing down the same answer.
+
+\begin{takeaway}
+Lagrange interpolation gives an explicit, elegant formula for the unique polynomial through $n+1$ points. The Lagrange basis polynomials are the key building blocks: each is 1 at one node and 0 at all others. The method is excellent for theory and small problems, but Newton's form (next section) is often more practical.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 4.3
+% ============================================================
+\section{Newton's Divided Differences}
+
+Lagrange's form is elegant, but it has a practical drawback: if we add a new data point, we must recompute the entire polynomial from scratch. Newton's form, based on \textbf{divided differences}, solves this problem.
+
+\subsection{The Idea of Divided Differences}
+
+Divided differences are a systematic way to compute the coefficients of the interpolating polynomial. They generalize the familiar concept of a slope.
+
+\begin{keyconcept}[title={Divided Differences (Recursive Definition)}]
+\textbf{Zeroth-order} divided difference:
+\[
+f[x_i] = y_i.
+\]
+
+\textbf{First-order} divided difference:
+\[
+f[x_i, x_{i+1}] = \frac{f[x_{i+1}] - f[x_i]}{x_{i+1} - x_i} = \frac{y_{i+1} - y_i}{x_{i+1} - x_i}.
+\]
+This is just the slope between two points.
+
+\textbf{Second-order} divided difference:
+\[
+f[x_i, x_{i+1}, x_{i+2}] = \frac{f[x_{i+1}, x_{i+2}] - f[x_i, x_{i+1}]}{x_{i+2} - x_i}.
+\]
+
+\textbf{$k$-th order} divided difference (general):
+\[
+f[x_i, x_{i+1}, \ldots, x_{i+k}] = \frac{f[x_{i+1}, \ldots, x_{i+k}] - f[x_i, \ldots, x_{i+k-1}]}{x_{i+k} - x_i}.
+\]
+Each divided difference is built from the two below it, like a triangle.
+\end{keyconcept}
+
+\subsection{The Divided Difference Table}
+
+The computation is organized in a triangular table. Each column is built from the previous one.
+
+\begin{example}[title={Divided Difference Table}]
+Using the same data as before:
+\begin{center}
+\begin{tabular}{c|ccc}
+$x_i$ & $f[x_i]$ & $f[x_i, x_{i+1}]$ & $f[x_i, x_{i+1}, x_{i+2}]$ \\
+\midrule
+$1$ & $2$ & & \\
+   &   & $\dfrac{3-2}{2-1} = 1$ & \\
+$2$ & $3$ & & $\dfrac{2-1}{4-1} = \dfrac{1}{3}$ \\
+   &   & $\dfrac{7-3}{4-2} = 2$ & \\
+$4$ & $7$ & &
+\end{tabular}
+\end{center}
+
+The divided differences along the \textbf{top diagonal} are: $2$, $1$, $\tfrac{1}{3}$.
+\end{example}
+
+\subsection{Newton's Interpolating Polynomial}
+
+The interpolating polynomial in Newton's form uses the divided differences as coefficients:
+
+\begin{keyconcept}[title={Newton's Interpolating Polynomial}]
+\[
+p_n(x) = f[x_0] + f[x_0, x_1](x - x_0) + f[x_0, x_1, x_2](x - x_0)(x - x_1) + \cdots
+\]
+More compactly:
+\[
+p_n(x) = \sum_{k=0}^{n} f[x_0, x_1, \ldots, x_k] \prod_{j=0}^{k-1}(x - x_j).
+\]
+\end{keyconcept}
+
+\begin{example}[title={Newton's Form: Complete Example}]
+Using the divided differences from above ($f[x_0] = 2$, $f[x_0,x_1] = 1$, $f[x_0,x_1,x_2] = \tfrac{1}{3}$):
+\begin{align*}
+p_2(x) &= 2 + 1 \cdot (x - 1) + \tfrac{1}{3}(x - 1)(x - 2) \\
+       &= 2 + (x - 1) + \tfrac{1}{3}(x-1)(x-2).
+\end{align*}
+
+Evaluate at $x = 3$:
+\[
+p_2(3) = 2 + (3-1) + \tfrac{1}{3}(3-1)(3-2) = 2 + 2 + \tfrac{2}{3} = \tfrac{14}{3} \approx 4.67.
+\]
+Same answer as Lagrange---as it must be, since the interpolating polynomial is unique.
+\end{example}
+
+\subsection{Adding New Data Points Efficiently}
+
+Here is Newton's form's great practical advantage:
+
+\begin{keyconcept}
+To add a new data point $(x_{n+1}, y_{n+1})$, we simply append \textbf{one new term} to the existing polynomial:
+\[
+p_{n+1}(x) = p_n(x) + f[x_0, x_1, \ldots, x_{n+1}]\prod_{j=0}^{n}(x - x_j).
+\]
+All previously computed divided differences are reused. Only one new column of the table is needed.
+\end{keyconcept}
+
+With Lagrange's form, adding a point would require recomputing all $n+2$ basis polynomials. Newton's form just extends the existing work.
+
+\begin{example}[title={Adding a Fourth Point}]
+Suppose we add the point $(x_3, y_3) = (5, 11)$ to our data. We extend the divided difference table:
+
+\begin{center}
+\begin{tabular}{c|cccc}
+$x_i$ & $f[\cdot]$ & $f[\cdot,\cdot]$ & $f[\cdot,\cdot,\cdot]$ & $f[\cdot,\cdot,\cdot,\cdot]$ \\
+\midrule
+$1$ & $2$ & & & \\
+   &   & $1$ & & \\
+$2$ & $3$ & & $\frac{1}{3}$ & \\
+   &   & $2$ & & $\frac{1/3 - 1/3}{5-1} = 0$ \\
+$4$ & $7$ & & $\frac{4-2}{5-2} = \frac{2}{3}$ & \\
+   &   & $\frac{11-7}{5-4} = 4$ & & \\
+$5$ & $11$ & & &
+\end{tabular}
+\end{center}
+
+The new coefficient is $f[x_0,x_1,x_2,x_3] = 0$. So:
+\[
+p_3(x) = p_2(x) + 0 \cdot (x-1)(x-2)(x-4) = p_2(x).
+\]
+The cubic coefficient happens to be zero---meaning our three-point quadratic already passes through the fourth point! Newton's form reveals this immediately.
+\end{example}
+
+\subsection{Connection to Lagrange Form}
+
+Newton's form and Lagrange's form produce the \textbf{same polynomial}---they are just two different ways of writing it. The choice between them is a matter of computational convenience:
+
+\begin{center}
+\begin{tabular}{@{} lll @{}}
+\toprule
+& \textbf{Lagrange Form} & \textbf{Newton Form} \\
+\midrule
+Conceptual clarity & Very clear & Requires divided differences \\
+Adding a new point & Must redo everything & Just add one term \\
+Computational cost & $O(n^2)$ per evaluation & $O(n^2)$ to build, $O(n)$ per evaluation \\
+Best for & Theory, proofs & Computation, adaptive algorithms \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+Newton's divided differences provide a recursive, table-driven way to build the interpolating polynomial. The Newton form is more practical than Lagrange for computation: it evaluates efficiently ($O(n)$ per point via Horner-like nesting) and allows new data points to be incorporated without starting over.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 4.4
+% ============================================================
+\section{Interpolation Error}
+
+We can build an interpolating polynomial that passes exactly through $n+1$ points. But how well does it estimate values \textbf{between} (or outside) those points? The answer depends on the function being interpolated and the placement of the nodes.
+
+\subsection{The Error Formula}
+
+If the data comes from a smooth function---that is, $y_i = f(x_i)$ for some sufficiently differentiable function $f$---then the interpolation error has a precise characterization.
+
+\begin{keyconcept}[title={Polynomial Interpolation Error}]
+If $f$ has $n+1$ continuous derivatives on the interval containing all nodes and the evaluation point $x$, then:
+\[
+f(x) - p_n(x) = \frac{f^{(n+1)}(\xi)}{(n+1)!}\,\prod_{i=0}^{n}(x - x_i)
+\]
+for some (unknown) $\xi$ between the smallest and largest of $x_0, x_1, \ldots, x_n, x$.
+\end{keyconcept}
+
+Let us unpack this formula. The error has \textbf{two factors}:
+
+\begin{enumerate}[leftmargin=2em]
+  \item $\dfrac{f^{(n+1)}(\xi)}{(n+1)!}$: This depends on the \textbf{smoothness of $f$}. If $f$ is a polynomial of degree $\leq n$, this term is exactly zero (the interpolation is perfect). For ``wiggly'' functions with large high-order derivatives, this term can be large.
+
+  \item $\displaystyle\prod_{i=0}^{n}(x - x_i)$: This is the \textbf{node polynomial}. It depends on how far $x$ is from the nodes and on the node spacing. It is zero at every node (confirming $p_n(x_i) = f(x_i)$) and can be large between nodes or outside the node interval.
+\end{enumerate}
+
+\begin{example}[title={Using the Error Bound}]
+Suppose we interpolate $f(x) = e^x$ using 3 equally spaced points on $[0, 1]$: $x_0 = 0$, $x_1 = 0.5$, $x_2 = 1$. The interpolating polynomial $p_2(x)$ has degree $\leq 2$.
+
+The error bound tells us:
+\[
+|f(x) - p_2(x)| \leq \frac{\max_{\xi \in [0,1]}|f'''(\xi)|}{3!} \cdot \max_{x \in [0,1]}|(x-0)(x-0.5)(x-1)|.
+\]
+
+Since $f'''(x) = e^x$ and $e^x \leq e^1 \approx 2.72$ on $[0,1]$:
+\[
+|f(x) - p_2(x)| \leq \frac{2.72}{6} \cdot \max_{x \in [0,1]}|x(x-0.5)(x-1)|.
+\]
+
+The maximum of $|x(x-0.5)(x-1)|$ on $[0,1]$ can be found (by calculus or numerically) to be approximately $0.0481$. So:
+\[
+|f(x) - p_2(x)| \leq \frac{2.72}{6} \times 0.0481 \approx 0.022.
+\]
+
+The interpolating quadratic approximates $e^x$ to within about $0.022$ on the entire interval.
+\end{example}
+
+\subsection{Runge's Phenomenon}
+
+One might think: ``More data points means a higher-degree polynomial, which should give a better approximation.'' This is \textbf{dangerously wrong} in general.
+
+\begin{warning}[title={Runge's Phenomenon}]
+For certain functions and equally spaced nodes, increasing the number of interpolation points can make the polynomial \textbf{oscillate wildly} near the edges of the interval, producing \textbf{worse} approximations despite using more data.
+\end{warning}
+
+The classic example is the \textbf{Runge function}:
+\[
+f(x) = \frac{1}{1 + 25x^2}, \quad x \in [-1, 1].
+\]
+
+This is a smooth, innocent-looking bell curve. But if we interpolate it with $n+1$ equally spaced nodes:
+\begin{itemize}[leftmargin=2em]
+  \item For $n = 4$ or $n = 6$: the polynomial looks reasonable.
+  \item For $n = 10$: large oscillations appear near $x = \pm 1$.
+  \item For $n = 20$: the oscillations become catastrophic---the polynomial swings to values of $\pm 10$ or more near the endpoints, even though $f(x)$ stays between $0$ and $1$ everywhere.
+\end{itemize}
+
+The culprit is the node polynomial $\prod(x - x_i)$: with equally spaced nodes, it grows very large near the edges. Higher degree makes this worse, not better.
+
+\subsection{What Can We Do About It?}
+
+Runge's phenomenon has two main remedies:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Use Chebyshev nodes} instead of equally spaced nodes. These are clustered more densely near the endpoints, which makes the node polynomial much smaller. (This is a topic explored further in graduate-level courses.)
+
+  \item \textbf{Use piecewise polynomials (splines)} instead of a single high-degree polynomial. This is the practical solution and the subject of the next section.
+\end{enumerate}
+
+\begin{takeaway}
+The interpolation error depends on the smoothness of $f$ and the placement of the nodes. A crucial lesson: \textbf{more points does not always mean better accuracy}. Runge's phenomenon shows that high-degree polynomials with equally spaced nodes can be disastrous. The practical fix is splines.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 4.5
+% ============================================================
+\section{Spline Interpolation}
+
+Spline interpolation is the practical answer to the problems of high-degree polynomial interpolation. Instead of one global polynomial of high degree, we use \textbf{many low-degree polynomials joined together smoothly}.
+
+\subsection{The Core Idea: Piecewise Polynomials}
+
+Rather than fitting a single degree-$n$ polynomial through all $n+1$ points, we divide the interval into subintervals and fit a \textbf{separate low-degree polynomial} on each one.
+
+\begin{keyconcept}
+A \textbf{spline} is a piecewise polynomial: on each subinterval $[x_i, x_{i+1}]$, it is a polynomial of some fixed degree, and at the joints (called \textbf{knots}) the pieces connect smoothly.
+\end{keyconcept}
+
+The smoothness conditions at the knots are what make splines special. Without them, we would just have disconnected polynomial pieces.
+
+\subsection{Linear Splines: The Simplest Case}
+
+A \textbf{linear spline} connects the data points with straight line segments. On each interval $[x_i, x_{i+1}]$:
+\[
+s(x) = y_i + \frac{y_{i+1} - y_i}{x_{i+1} - x_i}(x - x_i).
+\]
+
+This is just ``connect the dots.'' The result:
+\begin{itemize}[leftmargin=2em]
+  \item Passes through every data point. \checkmark
+  \item Is continuous. \checkmark
+  \item But has \textbf{corners} at the knots---the derivative is not continuous. The curve has a ``jagged'' appearance.
+\end{itemize}
+
+For a smooth-looking curve, we need higher-degree pieces with stronger continuity requirements.
+
+\subsection{Cubic Splines: The Gold Standard}
+
+\textbf{Cubic splines} use degree-3 polynomials on each subinterval and are the most widely used splines in practice.
+
+On each subinterval $[x_i, x_{i+1}]$ (for $i = 0, 1, \ldots, n-1$), the spline is a cubic polynomial:
+\[
+s_i(x) = a_i + b_i(x - x_i) + c_i(x - x_i)^2 + d_i(x - x_i)^3.
+\]
+
+\subsubsection{The Smoothness Conditions}
+
+The cubic pieces must satisfy several conditions:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Interpolation:} $s_i(x_i) = y_i$ and $s_i(x_{i+1}) = y_{i+1}$ for each piece. (The spline passes through every data point.)
+
+  \item \textbf{Continuity of $s$:} The pieces connect: $s_{i-1}(x_i) = s_i(x_i)$. (No jumps.)
+
+  \item \textbf{Continuity of $s'$:} The first derivative matches at each interior knot: $s'_{i-1}(x_i) = s'_i(x_i)$. (No corners.)
+
+  \item \textbf{Continuity of $s''$:} The second derivative matches at each interior knot: $s''_{i-1}(x_i) = s''_i(x_i)$. (No abrupt curvature changes.)
+\end{enumerate}
+
+\subsubsection{Counting Unknowns and Equations}
+
+With $n$ subintervals, we have $4n$ unknowns (four coefficients per piece). The conditions above give:
+\begin{itemize}[leftmargin=2em]
+  \item Interpolation at both ends of each interval: $2n$ equations.
+  \item Continuity of $s'$ at interior knots: $n-1$ equations.
+  \item Continuity of $s''$ at interior knots: $n-1$ equations.
+\end{itemize}
+Total: $2n + (n-1) + (n-1) = 4n - 2$ equations. We are \textbf{two equations short}! These two extra conditions are supplied by \textbf{boundary conditions}.
+
+\subsubsection{Boundary Conditions}
+
+The two most common choices:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Natural spline:} Set $s''(x_0) = 0$ and $s''(x_n) = 0$. The spline has zero curvature at the endpoints---it ``relaxes'' to a straight line.
+
+  \item \textbf{Clamped spline:} Specify $s'(x_0) = f'(x_0)$ and $s'(x_n) = f'(x_n)$. This uses known derivative information at the endpoints and generally gives a more accurate result.
+\end{itemize}
+
+\begin{example}[title={Cubic Spline in Action}]
+Consider data points $(0, 0)$, $(1, 1)$, $(2, 0)$ with a natural spline. We need two cubic pieces:
+\begin{align*}
+s_0(x) &= a_0 + b_0 x + c_0 x^2 + d_0 x^3, \quad x \in [0, 1], \\
+s_1(x) &= a_1 + b_1(x-1) + c_1(x-1)^2 + d_1(x-1)^3, \quad x \in [1, 2].
+\end{align*}
+
+Applying all the interpolation, continuity, and natural boundary conditions leads to a linear system that can be solved for the coefficients. The result is two smooth cubic curves that join seamlessly at $x = 1$ with matching slopes and curvatures.
+
+The key property: unlike a single quadratic through these three points, the cubic spline has the flexibility to produce a very smooth, natural-looking curve.
+\end{example}
+
+\subsection{Why Splines Avoid Runge's Phenomenon}
+
+The reason splines do not suffer from Runge's phenomenon is simple: each polynomial piece has low degree (typically 3), regardless of how many data points we have. Adding more data points means adding more pieces, not increasing the degree. The oscillations that plague high-degree polynomials simply cannot occur.
+
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+& \textbf{Global Polynomial} & \textbf{Cubic Spline} \\
+\midrule
+Degree & $n$ (grows with data) & 3 (always) \\
+Smoothness & Infinitely smooth & $C^2$ (second derivative continuous) \\
+Oscillation risk & High for large $n$ & Very low \\
+Practical use & Small $n$ only & Any number of points \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+Cubic splines are piecewise cubics joined with continuous first and second derivatives. They pass through all data points, produce smooth curves, and avoid Runge's phenomenon. Two boundary conditions are needed to make the system determined. Cubic splines are the practical choice for most interpolation tasks.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 4.6
+% ============================================================
+\section{Choosing an Interpolation Strategy}
+
+We now have several tools for interpolation. How do we choose?
+
+\subsection{Polynomials vs.\ Splines: Trade-Offs}
+
+\begin{center}
+\begin{tabular}{@{} p{0.15\textwidth} p{0.35\textwidth} p{0.35\textwidth} @{}}
+\toprule
+& \textbf{Global Polynomial} & \textbf{Cubic Spline} \\
+\midrule
+Best for & Few data points ($n \leq 5$ or so); theoretical analysis. & Many data points; smooth, reliable curves. \\[4pt]
+Degree & $n$ (one less than the number of points). & Always 3, regardless of the number of points. \\[4pt]
+Smoothness & Infinitely differentiable. & Twice differentiable ($C^2$). \\[4pt]
+Oscillation & Risk of Runge's phenomenon for large $n$ with equally spaced nodes. & No oscillation problems. \\[4pt]
+Ease of adding points & Newton form handles this well. & Must re-solve the spline system. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Effect of Node Spacing}
+
+The placement of interpolation nodes significantly affects accuracy:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Equally spaced nodes:} Simple and natural. Work well for smooth functions on small intervals or with splines. Can cause Runge's phenomenon with high-degree polynomial interpolation.
+
+  \item \textbf{Chebyshev nodes:} Clustered near the endpoints of the interval. Minimize the node polynomial $\prod(x - x_i)$, dramatically reducing interpolation error for polynomial interpolation. The ``optimal'' choice for global polynomial interpolation.
+
+  \item \textbf{Data-determined nodes:} In many practical applications, we do not choose the nodes---they are given to us (e.g., sensor locations, measurement times). In this case, splines are usually the safest choice.
+\end{itemize}
+
+\begin{keyconcept}
+If you \textbf{can choose} the nodes: use Chebyshev nodes for polynomial interpolation, or equally spaced nodes with splines.
+
+If you \textbf{cannot choose} the nodes (given data): use splines.
+\end{keyconcept}
+
+\subsection{Practical Guidelines}
+
+Here is a decision guide for interpolation:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{How many data points?}
+  \begin{itemize}
+    \item Few (3--5): Lagrange or Newton polynomial is simple and effective.
+    \item Many (10+): Use cubic splines.
+  \end{itemize}
+
+  \item \textbf{Is the data exact or noisy?}
+  \begin{itemize}
+    \item Exact: Interpolation is appropriate.
+    \item Noisy: Do \textbf{not} interpolate! Use least-squares fitting (Unit 5) instead.
+  \end{itemize}
+
+  \item \textbf{Do you need derivatives of the interpolant?}
+  \begin{itemize}
+    \item If you need high-order derivatives: global polynomials are infinitely smooth.
+    \item If you only need up to the second derivative: cubic splines suffice.
+  \end{itemize}
+
+  \item \textbf{Will you add data points incrementally?}
+  \begin{itemize}
+    \item Yes: Newton's divided difference form is ideal.
+    \item No: Any method works; choose based on other criteria.
+  \end{itemize}
+
+  \item \textbf{Do you need the interpolant for further computation (integration, differentiation)?}
+  \begin{itemize}
+    \item Polynomials are easy to integrate and differentiate exactly.
+    \item Splines can also be integrated and differentiated, but piecewise.
+  \end{itemize}
+\end{enumerate}
+
+\begin{takeaway}
+There is no universally ``best'' interpolation method. The right choice depends on the number of points, the smoothness needed, whether the data is exact, and the node placement. For most practical work with more than a handful of data points, \textbf{cubic splines are the default recommendation}: they are robust, smooth, and free of Runge's phenomenon.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 4 Summary}
+\addcontentsline{toc}{section}{Unit 4 Summary}
+
+This unit introduced the interpolation problem and three major approaches:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Lagrange interpolation} provides an explicit formula for the unique polynomial through $n+1$ points, built from basis polynomials that are 1 at one node and 0 at all others. Clean for theory; less practical for computation.
+
+  \item \textbf{Newton's divided differences} give the same polynomial in a different form, using a recursive table of divided differences as coefficients. The great advantage: new points can be added without recomputing from scratch.
+
+  \item \textbf{Cubic splines} use piecewise cubic polynomials joined with $C^2$ smoothness. They avoid the oscillation problems of high-degree polynomials and are the practical choice for most interpolation tasks.
+\end{enumerate}
+
+\medskip
+Key lessons:
+\begin{itemize}[leftmargin=2em]
+  \item The interpolating polynomial through $n+1$ points is \textbf{unique} (degree $\leq n$), regardless of the construction method.
+  \item The \textbf{interpolation error formula} reveals that accuracy depends on the smoothness of $f$ and the node polynomial $\prod(x - x_i)$.
+  \item \textbf{Runge's phenomenon} warns that high-degree polynomial interpolation with equally spaced nodes can be catastrophically inaccurate.
+  \item \textbf{Splines} solve this by keeping the polynomial degree low and letting the number of pieces grow with the data.
+  \item \textbf{Interpolation is for exact data}. For noisy data, curve fitting (Unit 5) is the right approach.
+\end{itemize}
+
+\end{document}
