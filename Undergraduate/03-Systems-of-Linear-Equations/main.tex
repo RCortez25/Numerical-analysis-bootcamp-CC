@@ -1,0 +1,825 @@
+\documentclass[12pt,a4paper]{article}
+
+% ============================================================
+%  PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{array}
+
+% ============================================================
+%  COLORS & STYLE
+% ============================================================
+\definecolor{primaryblue}{RGB}{0, 71, 171}
+\definecolor{accentred}{RGB}{180, 40, 40}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{darkgreen}{RGB}{0, 120, 60}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+}
+
+% Section styling
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{primaryblue!80!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{primaryblue!60!black}}{\thesubsubsection}{1em}{}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{Numerical Analysis Bootcamp}}
+\fancyhead[R]{\small\textcolor{primaryblue}{Unit 3: Systems of Linear Equations}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+%  CUSTOM ENVIRONMENTS
+% ============================================================
+\tcbuselibrary{skins, breakable}
+
+% Key Concept box
+\newtcolorbox{keyconcept}[1][]{
+  colback=primaryblue!5,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title={Key Concept},
+  breakable,
+  #1
+}
+
+% Example box
+\newtcolorbox{example}[1][]{
+  colback=darkgreen!5,
+  colframe=darkgreen,
+  fonttitle=\bfseries,
+  title={Example},
+  breakable,
+  #1
+}
+
+% Warning box
+\newtcolorbox{warning}[1][]{
+  colback=accentred!5,
+  colframe=accentred,
+  fonttitle=\bfseries,
+  title={Warning},
+  breakable,
+  #1
+}
+
+% Takeaway box
+\newtcolorbox{takeaway}[1][]{
+  colback=yellow!8,
+  colframe=orange!80!black,
+  fonttitle=\bfseries,
+  title={Takeaway},
+  breakable,
+  #1
+}
+
+% ============================================================
+%  DOCUMENT
+% ============================================================
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{primaryblue} Numerical Analysis Bootcamp \\[0.5cm]}
+{\LARGE Undergraduate Level \\[1.5cm]}
+{\rule{\textwidth}{1.5pt} \\[0.5cm]}
+{\huge\bfseries Unit 3 \\[0.3cm]}
+{\LARGE Systems of Linear Equations \\[0.5cm]}
+{\rule{\textwidth}{1.5pt} \\[2cm]}
+{\large
+How do we solve $A\mathbf{x} = \mathbf{b}$ when the system has\\
+tens, thousands, or millions of unknowns?\\
+Direct methods, factorizations, and iterative solvers.
+\\[3cm]}
+{\large\today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+%  SECTION 3.1
+% ============================================================
+\section{Why Linear Systems Matter}
+
+\subsection{Linear Systems Are Everywhere}
+
+Solving a system of linear equations is arguably the single most important computational task in all of applied mathematics. Nearly every numerical method we study in this bootcamp eventually reduces to solving a linear system.
+
+Here are just a few examples from different fields:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Structural engineering:} The forces and displacements in a bridge or building are found by solving a large linear system derived from Newton's laws of equilibrium.
+  \item \textbf{Electrical circuits:} Kirchhoff's laws produce a system of linear equations for the currents and voltages in a circuit.
+  \item \textbf{Computer graphics:} Transformations (rotation, scaling, projection) are matrix operations. Rendering a 3D scene involves solving many linear systems.
+  \item \textbf{Data science and machine learning:} Linear regression, principal component analysis, and many optimization algorithms rely on linear algebra at their core.
+  \item \textbf{Differential equations:} When we discretize a differential equation (Units 8--10), we almost always end up with a linear system to solve at each step.
+\end{itemize}
+
+\subsection{The Matrix Form: $A\mathbf{x} = \mathbf{b}$}
+
+A system of $n$ linear equations in $n$ unknowns can be written compactly in matrix form:
+\[
+A\mathbf{x} = \mathbf{b},
+\]
+where
+\[
+A = \begin{pmatrix}
+a_{11} & a_{12} & \cdots & a_{1n} \\
+a_{21} & a_{22} & \cdots & a_{2n} \\
+\vdots & \vdots & \ddots & \vdots \\
+a_{n1} & a_{n2} & \cdots & a_{nn}
+\end{pmatrix}, \qquad
+\mathbf{x} = \begin{pmatrix} x_1 \\ x_2 \\ \vdots \\ x_n \end{pmatrix}, \qquad
+\mathbf{b} = \begin{pmatrix} b_1 \\ b_2 \\ \vdots \\ b_n \end{pmatrix}.
+\]
+
+Here $A$ is the $n \times n$ \textbf{coefficient matrix}, $\mathbf{x}$ is the \textbf{unknown vector} we want to find, and $\mathbf{b}$ is the \textbf{right-hand side} vector.
+
+\begin{example}[title={A Small System}]
+The system
+\begin{align*}
+2x_1 + x_2 - x_3 &= 8, \\
+-3x_1 - x_2 + 2x_3 &= -11, \\
+-2x_1 + x_2 + 2x_3 &= -3,
+\end{align*}
+is written in matrix form as:
+\[
+\begin{pmatrix}
+2 & 1 & -1 \\
+-3 & -1 & 2 \\
+-2 & 1 & 2
+\end{pmatrix}
+\begin{pmatrix} x_1 \\ x_2 \\ x_3 \end{pmatrix}
+=
+\begin{pmatrix} 8 \\ -11 \\ -3 \end{pmatrix}.
+\]
+The solution, as we will verify shortly, is $\mathbf{x} = (2, \; 3, \; -1)^T$.
+\end{example}
+
+\subsection{Direct vs.\ Iterative Methods}
+
+There are two fundamentally different strategies for solving $A\mathbf{x} = \mathbf{b}$:
+
+\begin{center}
+\begin{tabular}{@{} p{0.44\textwidth} p{0.44\textwidth} @{}}
+\toprule
+\textbf{Direct Methods} & \textbf{Iterative Methods} \\
+\midrule
+Compute the exact solution (up to round-off) in a finite, predictable number of steps. & Produce a sequence of improving approximations; stop when accurate enough. \\[4pt]
+Examples: Gaussian elimination, LU decomposition. & Examples: Jacobi, Gauss--Seidel, conjugate gradient. \\[4pt]
+Best for small-to-medium systems (up to thousands of unknowns). & Best for very large, sparse systems (millions of unknowns). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In this unit, we focus primarily on \textbf{direct methods} (Sections 3.2--3.4) and give an \textbf{introduction to iterative methods} (Section 3.6). The choice between them depends on the size and structure of $A$.
+
+\begin{takeaway}
+Linear systems $A\mathbf{x} = \mathbf{b}$ arise in virtually every area of science, engineering, and data analysis. They are the computational backbone of numerical methods. We solve them with either direct methods (exact in finite steps) or iterative methods (approximate but scalable).
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 3.2
+% ============================================================
+\section{Gaussian Elimination}
+
+Gaussian elimination is the most fundamental algorithm in numerical linear algebra. You have likely seen it in a first linear algebra course; here we focus on the computational viewpoint.
+
+\subsection{The Core Idea}
+
+The strategy is simple and elegant:
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Forward elimination:} Use row operations to transform the system into \textbf{upper triangular form} (all zeros below the diagonal).
+  \item \textbf{Back substitution:} Solve the triangular system from bottom to top.
+\end{enumerate}
+
+\subsection{Row Operations}
+
+The three elementary row operations that do not change the solution are:
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Swap} two rows.
+  \item \textbf{Multiply} a row by a nonzero scalar.
+  \item \textbf{Add a multiple of one row to another row.}
+\end{enumerate}
+
+Gaussian elimination uses primarily operation 3: we add suitable multiples of one row to the rows below it in order to create zeros below the diagonal.
+
+\subsection{The Augmented Matrix}
+
+It is convenient to write the system $A\mathbf{x} = \mathbf{b}$ as an \textbf{augmented matrix} $[A \mid \mathbf{b}]$, which packages $A$ and $\mathbf{b}$ side by side:
+\[
+[A \mid \mathbf{b}] = \left(\begin{array}{ccc|c}
+a_{11} & a_{12} & a_{13} & b_1 \\
+a_{21} & a_{22} & a_{23} & b_2 \\
+a_{31} & a_{32} & a_{33} & b_3
+\end{array}\right).
+\]
+All row operations are then performed on this single matrix.
+
+\subsection{Forward Elimination: A Worked Example}
+
+\begin{example}[title={Gaussian Elimination Step by Step}]
+Solve the system from Section 3.1:
+\[
+\left(\begin{array}{rrr|r}
+2 & 1 & -1 & 8 \\
+-3 & -1 & 2 & -11 \\
+-2 & 1 & 2 & -3
+\end{array}\right).
+\]
+
+\textbf{Step 1:} Eliminate $x_1$ from rows 2 and 3.
+
+The element $a_{11} = 2$ is called the \textbf{pivot}. We compute multipliers:
+\begin{align*}
+m_{21} &= \frac{a_{21}}{a_{11}} = \frac{-3}{2} = -1.5, \\
+m_{31} &= \frac{a_{31}}{a_{11}} = \frac{-2}{2} = -1.
+\end{align*}
+
+Perform: $R_2 \leftarrow R_2 - m_{21} \cdot R_1$ and $R_3 \leftarrow R_3 - m_{31} \cdot R_1$:
+\[
+\left(\begin{array}{rrr|r}
+2 & 1 & -1 & 8 \\
+0 & 0.5 & 0.5 & 1 \\
+0 & 2 & 1 & 5
+\end{array}\right).
+\]
+
+\textbf{Step 2:} Eliminate $x_2$ from row 3.
+
+The new pivot is $a_{22} = 0.5$. Multiplier: $m_{32} = 2/0.5 = 4$.
+
+Perform: $R_3 \leftarrow R_3 - 4 \cdot R_2$:
+\[
+\left(\begin{array}{rrr|r}
+2 & 1 & -1 & 8 \\
+0 & 0.5 & 0.5 & 1 \\
+0 & 0 & -1 & 1
+\end{array}\right).
+\]
+
+The system is now in \textbf{upper triangular form}.
+\end{example}
+
+\subsection{Back Substitution}
+
+Once we have an upper triangular system, we solve from the bottom up:
+
+\begin{example}[title={Back Substitution (continued)}]
+From the triangular system:
+\begin{align*}
+2x_1 + x_2 - x_3 &= 8, \\
+0.5\,x_2 + 0.5\,x_3 &= 1, \\
+-x_3 &= 1.
+\end{align*}
+
+\textbf{Row 3:} $-x_3 = 1 \implies x_3 = -1$.
+
+\textbf{Row 2:} $0.5\,x_2 + 0.5(-1) = 1 \implies 0.5\,x_2 = 1.5 \implies x_2 = 3$.
+
+\textbf{Row 1:} $2x_1 + 3 - (-1) = 8 \implies 2x_1 = 4 \implies x_1 = 2$.
+
+\medskip
+Solution: $\mathbf{x} = (2, \; 3, \; -1)^T$. \checkmark
+\end{example}
+
+\subsection{The General Algorithm}
+
+For an $n \times n$ system:
+
+\textbf{Forward elimination (column $k = 1, 2, \ldots, n-1$):}
+\begin{enumerate}[leftmargin=2em]
+  \item For each row $i = k+1, k+2, \ldots, n$:
+  \begin{enumerate}
+    \item Compute the multiplier: $m_{ik} = a_{ik} / a_{kk}$.
+    \item Update row $i$: $R_i \leftarrow R_i - m_{ik} \cdot R_k$.
+  \end{enumerate}
+\end{enumerate}
+
+\textbf{Back substitution (row $i = n, n-1, \ldots, 1$):}
+\[
+x_i = \frac{1}{a_{ii}}\left(b_i - \sum_{j=i+1}^{n} a_{ij}\,x_j\right).
+\]
+
+\subsection{Computational Cost}
+
+How much work does Gaussian elimination require? For an $n \times n$ system:
+\begin{itemize}[leftmargin=2em]
+  \item Forward elimination: approximately $\dfrac{2n^3}{3}$ floating-point operations.
+  \item Back substitution: approximately $n^2$ operations.
+\end{itemize}
+
+The total cost is $O(n^3)$. For a $1000 \times 1000$ system, that is roughly $\frac{2}{3} \times 10^9$ operations---manageable on a modern computer. But for $n = 10^6$ (a million unknowns), $O(n^3)$ becomes prohibitive. This is one reason iterative methods (Section 3.6) exist.
+
+\begin{takeaway}
+Gaussian elimination transforms $A\mathbf{x} = \mathbf{b}$ into an upper triangular system via row operations (forward elimination), then solves it by back substitution. It is the workhorse algorithm for direct solution of linear systems, costing $O(n^3)$ operations.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 3.3
+% ============================================================
+\section{Pivoting Strategies}
+
+Gaussian elimination as described in Section 3.2 has a hidden fragility: it can fail or produce wildly inaccurate results if we are unlucky with the pivot elements.
+
+\subsection{Why Naive Elimination Can Fail}
+
+\subsubsection{Zero Pivot}
+
+The most obvious problem: what if a pivot $a_{kk} = 0$? Then the multiplier $m_{ik} = a_{ik}/a_{kk}$ involves division by zero, and the algorithm breaks down.
+
+\begin{example}[title={Zero Pivot}]
+Consider:
+\[
+\left(\begin{array}{rr|r}
+0 & 1 & 3 \\
+2 & 1 & 5
+\end{array}\right).
+\]
+The pivot $a_{11} = 0$. We cannot proceed! Yet the system clearly has a solution: just swap the two rows and solve.
+\end{example}
+
+\subsubsection{Small Pivot}
+
+A more subtle problem: even if the pivot is \emph{nonzero}, if it is very small relative to other entries, the multipliers $m_{ik}$ become very large, amplifying round-off errors dramatically.
+
+\begin{example}[title={Small Pivot Disaster}]
+Consider solving (using 4-digit arithmetic):
+\[
+\left(\begin{array}{rr|r}
+0.0001 & 1.000 & 1.000 \\
+1.000 & 1.000 & 2.000
+\end{array}\right).
+\]
+The exact solution is $x_1 = 1.00010\ldots \approx 1.000$ and $x_2 = 0.99990\ldots \approx 1.000$.
+
+\textbf{Without pivoting:} The multiplier is $m = 1.000/0.0001 = 10000$. After elimination:
+\[
+\left(\begin{array}{rr|r}
+0.0001 & 1.000 & 1.000 \\
+0 & -9999 & -9998
+\end{array}\right).
+\]
+In 4-digit arithmetic, $-9999$ is stored exactly but $-9998$ might round. Back substitution gives $x_2 \approx 1.000$, then $x_1 = (1.000 - 1.000 \times 1.000)/0.0001 = 0.000/0.0001 = 0$. This is \textbf{completely wrong}!
+
+\textbf{With pivoting} (swap the rows first):
+\[
+\left(\begin{array}{rr|r}
+1.000 & 1.000 & 2.000 \\
+0.0001 & 1.000 & 1.000
+\end{array}\right).
+\]
+Now the multiplier is $m = 0.0001/1.000 = 0.0001$, which is small and safe. The result is accurate: $x_1 \approx 1.000$, $x_2 \approx 1.000$. \checkmark
+\end{example}
+
+\subsection{Partial Pivoting}
+
+The standard remedy is \textbf{partial pivoting}: at each step, before performing elimination, search the column below (and including) the current pivot for the entry with the \textbf{largest absolute value}, and swap rows to bring it into the pivot position.
+
+\begin{keyconcept}[title={Partial Pivoting}]
+At step $k$ of Gaussian elimination, before computing multipliers:
+\begin{enumerate}
+  \item Find the row $p \geq k$ that has the largest $|a_{pk}|$ in column $k$.
+  \item Swap rows $k$ and $p$.
+  \item Proceed with elimination as usual.
+\end{enumerate}
+This ensures the multipliers satisfy $|m_{ik}| \leq 1$, which limits error amplification.
+\end{keyconcept}
+
+Partial pivoting is used in virtually all professional implementations of Gaussian elimination. It adds negligible computational cost (just a search and a swap) but dramatically improves numerical reliability.
+
+\subsection{Why This Works}
+
+When the pivot is the largest entry in its column, all multipliers satisfy $|m_{ik}| \leq 1$. This means the elimination step does not amplify the existing entries by large factors, keeping round-off error under control.
+
+\begin{warning}
+There exist rare, pathological matrices where even partial pivoting is not sufficient (error can still grow exponentially with $n$). \textbf{Complete pivoting}---searching the entire remaining submatrix for the largest entry---provides a stronger guarantee but is more expensive. In practice, partial pivoting works well for almost all problems encountered in science and engineering.
+\end{warning}
+
+\begin{takeaway}
+Naive Gaussian elimination can fail or lose accuracy when pivots are zero or very small. \textbf{Partial pivoting}---always choosing the largest available pivot in the column---is a simple, cheap fix that makes the algorithm robust. It is the standard in practice.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 3.4
+% ============================================================
+\section{LU Decomposition}
+
+LU decomposition is a clever reorganization of Gaussian elimination that is more efficient when we need to solve \emph{multiple} systems with the same coefficient matrix $A$.
+
+\subsection{The Idea: Factor Once, Solve Many Times}
+
+In many applications, we need to solve $A\mathbf{x} = \mathbf{b}$ for \textbf{several different} right-hand sides $\mathbf{b}_1, \mathbf{b}_2, \ldots, \mathbf{b}_m$. Gaussian elimination costs $O(n^3)$ for \emph{each} right-hand side. Can we do better?
+
+The answer is yes: we can \textbf{factor} $A$ into a product of simpler matrices \emph{once}, and then use this factorization to solve for each new $\mathbf{b}$ cheaply.
+
+\begin{keyconcept}[title={LU Decomposition}]
+The LU decomposition writes $A$ as a product of two triangular matrices:
+\[
+A = LU,
+\]
+where
+\begin{itemize}
+  \item $L$ is \textbf{lower triangular} (all entries above the diagonal are zero), with ones on the diagonal.
+  \item $U$ is \textbf{upper triangular} (all entries below the diagonal are zero).
+\end{itemize}
+\end{keyconcept}
+
+\subsection{Where Do $L$ and $U$ Come From?}
+
+Here is the beautiful connection: $U$ is exactly the upper triangular matrix produced by Gaussian elimination, and $L$ stores the multipliers used during elimination!
+
+Recall from Section 3.2 that the multipliers are $m_{ik} = a_{ik}/a_{kk}$. The matrix $L$ is:
+\[
+L = \begin{pmatrix}
+1 & 0 & 0 \\
+m_{21} & 1 & 0 \\
+m_{31} & m_{32} & 1
+\end{pmatrix}.
+\]
+
+So performing Gaussian elimination on $A$ simultaneously gives us both $L$ and $U$.
+
+\begin{example}[title={Computing the LU Decomposition}]
+From our earlier example:
+\[
+A = \begin{pmatrix}
+2 & 1 & -1 \\
+-3 & -1 & 2 \\
+-2 & 1 & 2
+\end{pmatrix}.
+\]
+
+During Gaussian elimination (Section 3.2), we computed:
+\begin{itemize}
+  \item Multipliers: $m_{21} = -1.5$, $m_{31} = -1$, $m_{32} = 4$.
+  \item Final upper triangular matrix: $U = \begin{pmatrix} 2 & 1 & -1 \\ 0 & 0.5 & 0.5 \\ 0 & 0 & -1 \end{pmatrix}$.
+\end{itemize}
+
+So the factorization is:
+\[
+A = LU = \underbrace{\begin{pmatrix} 1 & 0 & 0 \\ -1.5 & 1 & 0 \\ -1 & 4 & 1 \end{pmatrix}}_{L}
+\underbrace{\begin{pmatrix} 2 & 1 & -1 \\ 0 & 0.5 & 0.5 \\ 0 & 0 & -1 \end{pmatrix}}_{U}.
+\]
+
+You can verify: multiply $L \times U$ and you get $A$ back.
+\end{example}
+
+\subsection{Solving with LU}
+
+Once we have $A = LU$, solving $A\mathbf{x} = \mathbf{b}$ becomes two triangular solves:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Forward substitution:} Solve $L\mathbf{y} = \mathbf{b}$ for $\mathbf{y}$ (easy, since $L$ is lower triangular).
+  \item \textbf{Back substitution:} Solve $U\mathbf{x} = \mathbf{y}$ for $\mathbf{x}$ (easy, since $U$ is upper triangular).
+\end{enumerate}
+
+Why does this work? Because $A\mathbf{x} = LU\mathbf{x} = L(U\mathbf{x}) = L\mathbf{y} = \mathbf{b}$.
+
+\begin{example}[title={Solving with LU}]
+Solve $A\mathbf{x} = \mathbf{b}$ with $\mathbf{b} = (8, -11, -3)^T$.
+
+\textbf{Step 1: Forward substitution} ($L\mathbf{y} = \mathbf{b}$):
+\[
+\begin{pmatrix} 1 & 0 & 0 \\ -1.5 & 1 & 0 \\ -1 & 4 & 1 \end{pmatrix}
+\begin{pmatrix} y_1 \\ y_2 \\ y_3 \end{pmatrix} =
+\begin{pmatrix} 8 \\ -11 \\ -3 \end{pmatrix}.
+\]
+\begin{align*}
+y_1 &= 8, \\
+y_2 &= -11 - (-1.5)(8) = -11 + 12 = 1, \\
+y_3 &= -3 - (-1)(8) - (4)(1) = -3 + 8 - 4 = 1.
+\end{align*}
+So $\mathbf{y} = (8, 1, 1)^T$.
+
+\textbf{Step 2: Back substitution} ($U\mathbf{x} = \mathbf{y}$):
+\[
+\begin{pmatrix} 2 & 1 & -1 \\ 0 & 0.5 & 0.5 \\ 0 & 0 & -1 \end{pmatrix}
+\begin{pmatrix} x_1 \\ x_2 \\ x_3 \end{pmatrix} =
+\begin{pmatrix} 8 \\ 1 \\ 1 \end{pmatrix}.
+\]
+\begin{align*}
+x_3 &= 1/(-1) = -1, \\
+x_2 &= (1 - 0.5 \times (-1))/0.5 = 1.5/0.5 = 3, \\
+x_1 &= (8 - 1 \times 3 - (-1)(-1))/2 = (8 - 3 - 1)/2 = 2.
+\end{align*}
+Solution: $\mathbf{x} = (2, 3, -1)^T$. Same as before. \checkmark
+\end{example}
+
+\subsection{Why LU Is Efficient for Multiple Right-Hand Sides}
+
+Here is the key efficiency insight:
+
+\begin{center}
+\begin{tabular}{@{} lcc @{}}
+\toprule
+& \textbf{Factorization ($A = LU$)} & \textbf{Each solve ($L\mathbf{y} = \mathbf{b}$, $U\mathbf{x} = \mathbf{y}$)} \\
+\midrule
+Cost & $O(n^3)$ & $O(n^2)$ \\
+Done & Once & Once per right-hand side \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+If we have $m$ right-hand sides, Gaussian elimination from scratch costs $O(m \cdot n^3)$. With LU: $O(n^3 + m \cdot n^2)$---a huge saving when $m$ is large.
+
+\begin{keyconcept}
+LU decomposition separates the \textbf{expensive} part (factoring $A$, $O(n^3)$) from the \textbf{cheap} part (solving triangular systems, $O(n^2)$). Factor once, solve many times.
+\end{keyconcept}
+
+\begin{takeaway}
+LU decomposition is Gaussian elimination repackaged as a matrix factorization $A = LU$. The upper triangle $U$ comes from elimination; the lower triangle $L$ stores the multipliers. The factorization costs $O(n^3)$, but each subsequent solve with a new right-hand side costs only $O(n^2)$.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 3.5
+% ============================================================
+\section{Measuring Error in Linear Systems}
+
+We now have powerful tools to \emph{solve} linear systems. But how do we know whether to \emph{trust} the answer? This section introduces the tools for assessing solution quality.
+
+\subsection{Vector Norms: Measuring the ``Size'' of a Vector}
+
+To talk about errors, we need a way to measure how ``big'' a vector is. A \textbf{norm} is a function that assigns a non-negative length to every vector.
+
+\begin{keyconcept}[title={Common Vector Norms}]
+For a vector $\mathbf{v} = (v_1, v_2, \ldots, v_n)^T$:
+
+\medskip
+\begin{tabular}{@{} lll @{}}
+\toprule
+\textbf{Name} & \textbf{Formula} & \textbf{Intuition} \\
+\midrule
+$\ell^1$ norm & $\|\mathbf{v}\|_1 = |v_1| + |v_2| + \cdots + |v_n|$ & ``Taxicab distance'' \\[6pt]
+$\ell^2$ norm (Euclidean) & $\|\mathbf{v}\|_2 = \sqrt{v_1^2 + v_2^2 + \cdots + v_n^2}$ & Straight-line distance \\[6pt]
+$\ell^\infty$ norm & $\|\mathbf{v}\|_\infty = \max(|v_1|, |v_2|, \ldots, |v_n|)$ & Largest component \\
+\bottomrule
+\end{tabular}
+\end{keyconcept}
+
+\begin{example}
+For $\mathbf{v} = (3, -4, 1)^T$:
+\begin{align*}
+\|\mathbf{v}\|_1 &= |3| + |-4| + |1| = 8, \\
+\|\mathbf{v}\|_2 &= \sqrt{9 + 16 + 1} = \sqrt{26} \approx 5.10, \\
+\|\mathbf{v}\|_\infty &= \max(3, 4, 1) = 4.
+\end{align*}
+\end{example}
+
+All three norms measure the ``size'' of a vector, just in slightly different ways. In numerical analysis, \textbf{any} of them can be used---the choice is often dictated by convenience.
+
+\subsection{Matrix Norms}
+
+We also need to measure the ``size'' of a matrix. The most natural matrix norms are \textbf{induced} by vector norms:
+
+\begin{keyconcept}
+The matrix norm induced by a vector norm $\|\cdot\|$ is:
+\[
+\|A\| = \max_{\mathbf{v} \neq \mathbf{0}} \frac{\|A\mathbf{v}\|}{\|\mathbf{v}\|}.
+\]
+Intuitively: $\|A\|$ is the maximum factor by which $A$ can stretch a vector.
+\end{keyconcept}
+
+For practical computation:
+\begin{itemize}[leftmargin=2em]
+  \item $\|A\|_1$ = maximum absolute column sum.
+  \item $\|A\|_\infty$ = maximum absolute row sum.
+\end{itemize}
+
+\begin{example}
+For $A = \begin{pmatrix} 2 & 1 \\ -1 & 3 \end{pmatrix}$:
+\begin{align*}
+\|A\|_1 &= \max(|2|+|-1|, \; |1|+|3|) = \max(3, 4) = 4, \\
+\|A\|_\infty &= \max(|2|+|1|, \; |-1|+|3|) = \max(3, 4) = 4.
+\end{align*}
+\end{example}
+
+\subsection{The Condition Number of a Matrix}
+
+Now we arrive at the central concept for assessing the reliability of a linear system's solution.
+
+\begin{keyconcept}[title={Condition Number}]
+The \textbf{condition number} of a nonsingular matrix $A$ is:
+\[
+\kappa(A) = \|A\| \cdot \|A^{-1}\|.
+\]
+It satisfies $\kappa(A) \geq 1$.
+\end{keyconcept}
+
+The condition number tells us how sensitive the solution $\mathbf{x}$ is to perturbations in $A$ or $\mathbf{b}$. Specifically:
+
+\begin{quote}
+\emph{If $\mathbf{b}$ is perturbed by a relative amount $\epsilon$, the solution $\mathbf{x}$ can change by up to $\kappa(A) \cdot \epsilon$ in relative terms.}
+\end{quote}
+
+\begin{itemize}[leftmargin=2em]
+  \item $\kappa(A) \approx 1$: The system is \textbf{well-conditioned}. Small input perturbations produce small output changes. The computed solution is trustworthy.
+  \item $\kappa(A) \gg 1$: The system is \textbf{ill-conditioned}. Small input perturbations can produce large output changes. The computed solution may have few correct digits.
+\end{itemize}
+
+\begin{example}[title={Well-Conditioned vs.\ Ill-Conditioned}]
+\textbf{Well-conditioned:}
+$A = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}$ (the identity matrix). Here $\kappa(A) = 1$. The solution $\mathbf{x} = \mathbf{b}$ is perfectly stable.
+
+\medskip
+\textbf{Ill-conditioned:}
+$A = \begin{pmatrix} 1 & 1 \\ 1 & 1.0001 \end{pmatrix}$. This matrix is nearly singular (the rows are almost identical). Its condition number is $\kappa(A) \approx 40{,}000$. A perturbation of $10^{-8}$ in $\mathbf{b}$ could cause the solution to change by $\sim 4 \times 10^{-4}$ in relative terms---a loss of about 4--5 digits of accuracy.
+\end{example}
+
+\subsection{The Rule of Thumb}
+
+A practical guideline for double precision ($\varepsilon_{\mathrm{mach}} \approx 10^{-16}$):
+
+\begin{keyconcept}[title={Digit Loss Rule}]
+If $\kappa(A) \approx 10^k$, then the computed solution loses roughly $k$ digits of accuracy compared to the 16 digits available in double precision.
+
+\medskip
+\begin{itemize}
+  \item $\kappa = 10^2$: $\sim$14 correct digits. Fine.
+  \item $\kappa = 10^8$: $\sim$8 correct digits. Acceptable for many purposes.
+  \item $\kappa = 10^{14}$: $\sim$2 correct digits. Barely usable.
+  \item $\kappa = 10^{16}$ or more: No correct digits. The system is \textbf{effectively singular}.
+\end{itemize}
+\end{keyconcept}
+
+\begin{warning}
+A large residual $\|\mathbf{b} - A\hat{\mathbf{x}}\|$ means a bad solution. But a \textbf{small residual does not guarantee a good solution!} For ill-conditioned systems, the residual can be tiny while the error $\|\mathbf{x} - \hat{\mathbf{x}}\|$ is large. The condition number is what tells you whether to trust the answer.
+\end{warning}
+
+\begin{takeaway}
+Vector and matrix norms quantify ``size.'' The condition number $\kappa(A) = \|A\|\,\|A^{-1}\|$ measures how sensitive the solution of $A\mathbf{x} = \mathbf{b}$ is to perturbations. Large $\kappa$ means the problem is ill-conditioned: no algorithm can produce a highly accurate solution from slightly imprecise data.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SECTION 3.6
+% ============================================================
+\section{Iterative Methods (Introduction)}
+
+Direct methods (Gaussian elimination, LU) give the exact answer (up to round-off) in a finite number of steps. But for \textbf{very large systems}---thousands to millions of unknowns, common in engineering and science---the $O(n^3)$ cost of direct methods becomes prohibitive. Iterative methods offer a scalable alternative.
+
+\subsection{The Basic Idea}
+
+Instead of computing the exact solution in one shot, an iterative method produces a sequence of approximations:
+\[
+\mathbf{x}^{(0)}, \; \mathbf{x}^{(1)}, \; \mathbf{x}^{(2)}, \; \ldots
+\]
+that (we hope) converge to the true solution $\mathbf{x}^*$. We stop when the approximation is ``good enough.''
+
+The general strategy: split the matrix $A$ into parts that are easy to solve, and iterate.
+
+\subsection{The Jacobi Method}
+
+The Jacobi method is the simplest iterative solver. The idea: solve each equation for one variable, using the \emph{previous} iteration's values for the other variables.
+
+For the $i$-th equation $\sum_j a_{ij} x_j = b_i$, solve for $x_i$:
+\[
+x_i^{(k+1)} = \frac{1}{a_{ii}}\left(b_i - \sum_{\substack{j=1 \\ j \neq i}}^{n} a_{ij}\,x_j^{(k)}\right).
+\]
+
+\begin{keyconcept}[title={Jacobi Method}]
+Starting from an initial guess $\mathbf{x}^{(0)}$, the Jacobi iteration updates \textbf{all} components simultaneously using the values from the \textbf{previous} step:
+\[
+x_i^{(k+1)} = \frac{1}{a_{ii}}\left(b_i - \sum_{j \neq i} a_{ij}\,x_j^{(k)}\right), \quad i = 1, 2, \ldots, n.
+\]
+\end{keyconcept}
+
+\begin{example}[title={Jacobi Method}]
+Solve:
+\begin{align*}
+4x_1 - x_2 + x_3 &= 7, \\
+4x_1 - 8x_2 + x_3 &= -21, \\
+-2x_1 + x_2 + 5x_3 &= 15.
+\end{align*}
+
+Starting from $\mathbf{x}^{(0)} = (0, 0, 0)^T$, the Jacobi iteration gives:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} clll @{}}
+\toprule
+$k$ & $x_1^{(k)}$ & $x_2^{(k)}$ & $x_3^{(k)}$ \\
+\midrule
+0 & 0.0000 & 0.0000 & 0.0000 \\
+1 & 1.7500 & 2.6250 & 3.0000 \\
+2 & 1.8438 & 3.4688 & 2.8750 \\
+3 & 2.1484 & 3.3828 & 2.9563 \\
+4 & 2.1066 & 3.4136 & 2.9828 \\
+5 & 2.1077 & 3.3987 & 2.9601 \\
+$\vdots$ & $\vdots$ & $\vdots$ & $\vdots$ \\
+$\infty$ & 2.0000 & 4.0000 & 3.0000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The iterates gradually approach the exact solution $(2, 4, 3)^T$, though convergence is slow.
+\end{example}
+
+\subsection{The Gauss--Seidel Method}
+
+The Gauss--Seidel method is a simple improvement: when computing $x_i^{(k+1)}$, use the \textbf{already-updated} values $x_1^{(k+1)}, \ldots, x_{i-1}^{(k+1)}$ instead of the old values $x_1^{(k)}, \ldots, x_{i-1}^{(k)}$.
+
+\begin{keyconcept}[title={Gauss--Seidel Method}]
+\[
+x_i^{(k+1)} = \frac{1}{a_{ii}}\left(b_i - \sum_{j=1}^{i-1} a_{ij}\,x_j^{(k+1)} - \sum_{j=i+1}^{n} a_{ij}\,x_j^{(k)}\right).
+\]
+The key difference: use the \textbf{latest available values}, not all from the previous step.
+\end{keyconcept}
+
+Gauss--Seidel typically converges \textbf{faster} than Jacobi because it uses more up-to-date information. The computational cost per iteration is essentially the same.
+
+\subsection{When Do Iterative Methods Converge?}
+
+Not every system admits a convergent iterative solution. The most important sufficient condition is:
+
+\begin{keyconcept}[title={Diagonal Dominance}]
+A matrix $A$ is \textbf{strictly diagonally dominant} if, for every row $i$:
+\[
+|a_{ii}| > \sum_{\substack{j=1 \\ j \neq i}}^{n} |a_{ij}|.
+\]
+That is, each diagonal entry is larger (in absolute value) than the sum of all other entries in its row.
+
+If $A$ is strictly diagonally dominant, then both the Jacobi and Gauss--Seidel methods are \textbf{guaranteed to converge} for any starting guess.
+\end{keyconcept}
+
+Intuitively, diagonal dominance means the system is ``nearly decoupled''---each equation is mainly about one variable, with the others having smaller influence. This is exactly the setting where iterating equation by equation works well.
+
+\subsection{Direct vs.\ Iterative: When to Use Which?}
+
+\begin{center}
+\begin{tabular}{@{} p{0.44\textwidth} p{0.44\textwidth} @{}}
+\toprule
+\textbf{Direct Methods} & \textbf{Iterative Methods} \\
+\midrule
+Best for small to medium $n$ (up to a few thousand). & Best for large $n$ (thousands to millions). \\[4pt]
+Cost: $O(n^3)$ regardless of matrix structure. & Cost per iteration: $O(n^2)$ for dense, $O(n)$ for sparse matrices. \\[4pt]
+Give the exact answer (modulo round-off). & Give an approximate answer; accuracy improves with more iterations. \\[4pt]
+Work for any nonsingular $A$. & May not converge for all $A$; convergence depends on matrix properties. \\[4pt]
+Fill-in: elimination can destroy sparsity. & Preserve sparsity: only multiply by $A$, never modify it. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{takeaway}
+Iterative methods (Jacobi, Gauss--Seidel) build up the solution step by step, making them practical for large, sparse systems where direct methods are too expensive. They converge reliably for diagonally dominant systems and offer a favorable cost-per-iteration when the matrix is sparse.
+\end{takeaway}
+
+\newpage
+% ============================================================
+%  SUMMARY
+% ============================================================
+\section*{Unit 3 Summary}
+\addcontentsline{toc}{section}{Unit 3 Summary}
+
+This unit covered the numerical solution of linear systems $A\mathbf{x} = \mathbf{b}$, the most fundamental task in computational mathematics.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Gaussian elimination} transforms the system into upper triangular form via row operations, then solves by back substitution. Cost: $O(n^3)$.
+
+  \item \textbf{Pivoting} (especially partial pivoting) is essential for numerical stability. Always choose the largest pivot in the column to keep multipliers bounded and errors controlled.
+
+  \item \textbf{LU decomposition} factors $A = LU$, storing Gaussian elimination as a matrix product. The expensive $O(n^3)$ factorization is done once; each new right-hand side $\mathbf{b}$ is then solved cheaply in $O(n^2)$.
+
+  \item \textbf{Norms and condition numbers} measure solution sensitivity. The condition number $\kappa(A) = \|A\|\,\|A^{-1}\|$ tells us how many digits of accuracy we can expect. A small residual alone does not guarantee a good solution.
+
+  \item \textbf{Iterative methods} (Jacobi, Gauss--Seidel) build up the solution gradually and are the method of choice for large, sparse systems. They converge for diagonally dominant matrices.
+\end{enumerate}
+
+\medskip
+Key themes:
+\begin{itemize}[leftmargin=2em]
+  \item Direct methods are exact but costly ($O(n^3)$); iterative methods are approximate but scalable.
+  \item \textbf{Pivoting} is not optional---it is essential for reliable computation.
+  \item The \textbf{condition number} is your best tool for knowing how much to trust a computed solution.
+  \item LU decomposition illustrates a powerful pattern: \textbf{precompute structure once, reuse it many times}.
+\end{itemize}
+
+\end{document}
